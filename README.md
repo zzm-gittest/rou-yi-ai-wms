@@ -132,8 +132,17 @@ RuoYi-AI-WMS
 ├── ruoyi-generator  # 代码生成
 ├── ruoyi-quartz     # 定时任务
 ├── ruoyi-ui         # 前端（Vue2 + Element UI）
-└── sql              # 数据库脚本
+├── sql              # 数据库脚本
+└── docs             # 文档与图片素材
 ```
+
+## 联系作者
+
+对项目有问题、建议或商务合作，欢迎微信扫码添加作者交流：
+
+<p align="center">
+	<img src="./docs/images/wechat-contact.jpg" alt="微信联系作者" width="360">
+</p>
 
 ## 致谢
 
