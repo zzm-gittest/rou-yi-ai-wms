@@ -6,6 +6,7 @@
 <p align="center">
 	<a href="https://gitee.com/y_project/RuoYi-Vue"><img src="https://img.shields.io/badge/RuoYi--AI--WMS-v3.9.1-brightgreen.svg"></a>
 	<a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
+	<a href="https://zhicun.site"><img src="https://img.shields.io/badge/%E5%9C%A8%E7%BA%BF%E6%BC%94%E7%A4%BA-zhicun.site-orange.svg"></a>
 </p>
 
 ## 平台简介
@@ -17,6 +18,12 @@ RuoYi-AI-WMS 是一套基于 [RuoYi-Vue](https://gitee.com/y_project/RuoYi-Vue) 
 * 数据库：MySQL 8.x
 * 多租户 SaaS 架构，租户间数据隔离
 * AI 能力基于阿里云 DashScope（通义千问系列模型）
+
+## 在线演示
+
+演示地址：**[https://zhicun.site](https://zhicun.site)**
+
+无需注册，打开即可体验，也可直接使用下方演示账号登录。
 
 ## 核心特性
 
