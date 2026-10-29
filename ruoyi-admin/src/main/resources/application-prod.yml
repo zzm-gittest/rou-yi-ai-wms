@@ -148,9 +148,14 @@ ai:
     qwen:
       api-key: sk-******************
       api-url: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
-      model: qwen3.6-flash
+      model: qwen3.8-flash
+      # qwen3.x 混合推理模型：录单/解析类任务显式关闭思考模式，避免先输出推理 token 导致响应慢
+      thinking-enabled: false
       max-tokens: 2000
       temperature: 0.7
+    # 语音识别模型（ASR，实时识别 API；租户级配置优先于此处）
+    asr:
+      model: paraformer-realtime-v2
 # 云打印配置
 cloud:
   print:

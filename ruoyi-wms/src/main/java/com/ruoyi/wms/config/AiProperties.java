@@ -66,6 +66,22 @@ public class AiProperties {
          */
         private Double temperature = 0.7;
 
+        /**
+         * 思考模式开关（qwen3.x 混合推理模型生效）。
+         * null=不传该参数（跟随服务端默认）；false=显式关闭思考，显著降低首字延迟与 token 消耗；
+         * true=开启深度思考（慢，适合复杂推理场景）。
+         * 录单/解析类任务建议 false。
+         */
+        private Boolean thinkingEnabled;
+
+        public Boolean getThinkingEnabled() {
+            return thinkingEnabled;
+        }
+
+        public void setThinkingEnabled(Boolean thinkingEnabled) {
+            this.thinkingEnabled = thinkingEnabled;
+        }
+
         public String getApiKey() {
             return apiKey;
         }

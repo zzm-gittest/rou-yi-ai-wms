@@ -72,7 +72,7 @@ public class SaasYmlLlmClient implements LlmClient {
         Double temperature = request.getTemperature() != null ? request.getTemperature() : qwen.getTemperature();
 
         String body = buildChatRequestBody(model, request.resolvedMessages(), maxTokens, temperature,
-            Boolean.TRUE.equals(request.getJsonMode()));
+            Boolean.TRUE.equals(request.getJsonMode()), qwen.getThinkingEnabled());
 
         Request httpRequest = new Request.Builder()
             .url(apiUrl)
@@ -158,7 +158,8 @@ public class SaasYmlLlmClient implements LlmClient {
     /* ===================== private helpers ===================== */
 
     private String buildChatRequestBody(String model, List<LlmChatRequest.Message> messages,
-                                        int maxTokens, double temperature, boolean jsonMode) {
+                                        int maxTokens, double temperature, boolean jsonMode,
+                                        Boolean thinkingEnabled) {
         StringBuilder sb = new StringBuilder();
         sb.append("{\"model\":\"").append(escapeJson(model)).append("\",");
         sb.append("\"messages\":[");
@@ -174,6 +175,9 @@ public class SaasYmlLlmClient implements LlmClient {
         sb.append("],");
         sb.append("\"max_tokens\":").append(maxTokens).append(",");
         sb.append("\"temperature\":").append(temperature);
+        if (thinkingEnabled != null) {
+            sb.append(",\"enable_thinking\":").append(thinkingEnabled);
+        }
         if (jsonMode) {
             sb.append(",\"response_format\":{\"type\":\"json_object\"}");
         }
