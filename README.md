@@ -23,7 +23,7 @@ RuoYi-AI-WMS 是一套基于 [RuoYi-Vue](https://gitee.com/y_project/RuoYi-Vue) 
 
 演示地址：**[https://zhicun.site](https://zhicun.site)**
 
-无需注册，打开即可体验，也可直接使用下方演示账号登录。
+无需注册，打开即可体验。
 
 ## 核心特性
 
