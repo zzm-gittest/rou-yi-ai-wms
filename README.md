@@ -43,6 +43,10 @@ RuoYi-AI-WMS 是一套基于 [RuoYi-Vue](https://gitee.com/y_project/RuoYi-Vue) 
 - **截图识别**：粘贴/上传单据截图，AI 视觉模型自动提取商品明细填充表单
 - **智能查询**：自然语言查询库存、订单状态等业务数据
 
+<p align="center">
+	<img src="./docs/images/demo-ai-assistant.gif" alt="AI 助手演示：对话建单、语音录入、截图识别" width="800">
+</p>
+
 ## 内置功能（若依基础模块）
 
 1. 用户管理、部门管理、岗位管理
