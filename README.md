@@ -57,7 +57,7 @@ RuoYi-AI-WMS 是一套基于 [RuoYi-Vue](https://gitee.com/y_project/RuoYi-Vue) 
 ### 后端
 
 ```bash
-# 1. 创建数据库 ry-vue（utf8mb4），执行 sql/ 目录下的初始化脚本
+# 1. 创建数据库 ry-vue（utf8mb4），执行 sql/ry-vue-20261029.sql 初始化脚本（内容见下方说明）
 # 2. 修改 ruoyi-admin/src/main/resources/application-druid.yml 中的数据库连接
 #    修改 application.yml 中的 Redis 配置
 # 3. 启动
@@ -81,7 +81,20 @@ npm run dev
 ### 默认账号
 
 - 管理员：`admin / admin123`
-- 体验账号：登录页点击「体验一下」一键进入
+- 体验账号：登录页点击「体验一下」一键进入（`zhaoyun`，所属演示租户）
+
+### 数据库脚本说明
+
+`sql/ry-vue-20261029.sql` 为开箱即用的初始化脚本，直接导入即可：
+
+| 内容 | 说明 |
+| --- | --- |
+| 表结构 | 全部 82 张表的建表语句（系统表 + 进销存业务表 + AI 相关表） |
+| 基础配置数据 | 菜单、角色、角色-菜单授权、部门、岗位、字典、参数配置、定时任务等 |
+| 演示数据 | 租户与演示账号（`admin`、`zhaoyun`），无任何业务单据 |
+| 业务数据 | 已清空（销售/采购/库存/日志等），导入后是干净的空库 |
+
+> 该脚本已做脱敏处理：不含任何 API 密钥、真实手机号、公司信息与业务数据，演示账号的租户级 AI 配置为占位符，运行前请在 `application.yml` 或「企业设置」中填入自己的 DashScope Key。
 
 ## AI 能力配置
 
@@ -92,7 +105,8 @@ ai:
   service:
     qwen:
       api-key: 你的 DashScope API Key   # https://dashscope.console.aliyun.com
-      model: qwen3.6-flash              # 对话模型
+      model: qwen3.8-flash              # 对话模型
+      thinking-enabled: false           # 关闭 qwen3.x 思考模式，降低录单/解析类任务延迟
     vision:
       model: qwen3.8-omni-flash         # 截图识别视觉模型
 ```
