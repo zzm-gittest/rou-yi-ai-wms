@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.wms.mapper.WmsPurchaseReturnItemMapper">
+
+    <resultMap type="com.ruoyi.wms.domain.WmsPurchaseReturnItem" id="WmsPurchaseReturnItemResult">
+        <id     property="id"            column="id"            />
+        <result property="tenantId"      column="tenant_id"     />
+        <result property="returnId"      column="return_id"     />
+        <result property="skuId"         column="sku_id"        />
+        <result property="goodsId"       column="goods_id"      />
+        <result property="skuCode"       column="sku_code"      />
+        <result property="skuName"       column="sku_name"      />
+        <result property="specInfo"      column="spec_info"     />
+        <result property="unitId"        column="unit_id"       />
+        <result property="unitName"      column="unit_name"     />
+        <result property="quantity"      column="quantity"      />
+        <result property="price"         column="price"         />
+        <result property="amount"        column="amount"        />
+        <result property="remark"        column="remark"        />
+    </resultMap>
+
+</mapper>

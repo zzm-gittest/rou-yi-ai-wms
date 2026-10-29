@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.wms.mapper.report.WmsFinanceReportMapper">
+
+    <!-- 查询应收账款账龄分析表 -->
+    <select id="queryArAgingReport" resultType="com.ruoyi.wms.domain.report.vo.ArAgingReportVO">
+        SELECT
+            c.customer_code AS customerCode,
+            c.customer_name AS customerName,
+            SUM(ar.ar_amount) AS totalAr,
+            SUM(CASE WHEN DATEDIFF(#{statisticsDate}, ar.create_time) &lt;= 30 THEN ar.ar_amount ELSE 0 END) AS within30,
+            SUM(CASE WHEN DATEDIFF(#{statisticsDate}, ar.create_time) BETWEEN 31 AND 60 THEN ar.ar_amount ELSE 0 END) AS days30_60,
+            SUM(CASE WHEN DATEDIFF(#{statisticsDate}, ar.create_time) BETWEEN 61 AND 90 THEN ar.ar_amount ELSE 0 END) AS days60_90,
+            SUM(CASE WHEN DATEDIFF(#{statisticsDate}, ar.create_time) BETWEEN 91 AND 180 THEN ar.ar_amount ELSE 0 END) AS days90_180,
+            SUM(CASE WHEN DATEDIFF(#{statisticsDate}, ar.create_time) &gt; 180 THEN ar.ar_amount ELSE 0 END) AS over180,
+            SUM(CASE WHEN DATEDIFF(#{statisticsDate}, ar.create_time) &gt; COALESCE(ar.payment_days, 30)
+                THEN ar.ar_amount ELSE 0 END) AS overdueAmount,
+            CASE WHEN SUM(ar.ar_amount) > 0
+                THEN ROUND((SUM(CASE WHEN DATEDIFF(#{statisticsDate}, ar.create_time) &gt; COALESCE(ar.payment_days, 30)
+                    THEN ar.ar_amount ELSE 0 END) / SUM(ar.ar_amount)) * 100, 2)
+                ELSE 0 END AS overdueRate
+        FROM wms_accounts_receivable ar
+        INNER JOIN wms_customer c ON ar.customer_id = c.id
+        WHERE ar.del_flag = 0
+            AND c.del_flag = 0
+            AND ar.ar_status = '0'
+            <if test="customerIds != null and customerIds.size() > 0">
+                AND ar.customer_id IN
+                <foreach collection="customerIds" item="id" open="(" separator="," close=")">
+                    #{id}
+                </foreach>
+            </if>
+        GROUP BY c.id, c.customer_code, c.customer_name
+        HAVING SUM(ar.ar_amount) > 0
+        ORDER BY totalAr DESC
+    </select>
+
+    <!-- 查询供应商采购分析表 -->
+    <select id="querySupplierAnalysisReport" resultType="com.ruoyi.wms.domain.report.vo.SupplierAnalysisReportVO">
+        SELECT
+            s.supplier_code AS supplierCode,
+            s.supplier_name AS supplierName,
+            s.contact,
+            s.phone,
+            COALESCE(order_counts.cnt, 0) AS orderCount,
+            COALESCE(order_amounts.amt, 0) AS orderAmount,
+            COALESCE(in_amounts.amt, 0) AS inAmount,
+            COALESCE(return_amounts.amt, 0) AS returnAmount,
+            COALESCE(in_amounts.amt, 0) - COALESCE(return_amounts.amt, 0) AS netPurchase,
+            COALESCE(ap_totals.amt, 0) AS apAmount,
+            COALESCE(paid_totals.amt, 0) AS paidAmount,
+            CASE WHEN COALESCE(ap_totals.amt, 0) > 0
+                THEN ROUND((COALESCE(paid_totals.amt, 0) / COALESCE(ap_totals.amt, 1)) * 100, 2)
+                ELSE 0 END AS paymentRate,
+            COALESCE(avg_prices.price, 0) AS avgPrice,
+            MAX(po.create_time) AS lastOrderDate
+        FROM wms_supplier s
+        LEFT JOIN (
+            SELECT supplier_id, COUNT(*) AS cnt, SUM(total_amount) AS amt
+            FROM wms_purchase_order
+            WHERE del_flag = 0
+                <choose>
+                    <when test="startDate != null and endDate != null">
+                        AND DATE(create_time) BETWEEN #{startDate} AND #{endDate}
+                    </when>
+                    <otherwise>
+                        AND DATE(create_time) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                    </otherwise>
+                </choose>
+                <if test="supplierIds != null and supplierIds.size() > 0">
+                    AND supplier_id IN
+                    <foreach collection="supplierIds" item="id" open="(" separator="," close=")">
+                        #{id}
+                    </foreach>
+                </if>
+            GROUP BY supplier_id
+        ) order_counts ON s.id = order_counts.supplier_id
+        LEFT JOIN (
+            SELECT supplier_id, SUM(total_amount) AS amt
+            FROM wms_purchase_order
+            WHERE del_flag = 0
+                <choose>
+                    <when test="startDate != null and endDate != null">
+                        AND DATE(create_time) BETWEEN #{startDate} AND #{endDate}
+                    </when>
+                    <otherwise>
+                        AND DATE(create_time) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                    </otherwise>
+                </choose>
+            GROUP BY supplier_id
+        ) order_amounts ON s.id = order_amounts.supplier_id
+        LEFT JOIN (
+            SELECT pi.supplier_id, SUM(pi.total_amount) AS amt
+            FROM wms_purchase_in pi
+            WHERE pi.del_flag = 0
+                AND pi.status = '1'
+                <choose>
+                    <when test="startDate != null and endDate != null">
+                        AND DATE(pi.create_time) BETWEEN #{startDate} AND #{endDate}
+                    </when>
+                    <otherwise>
+                        AND DATE(pi.create_time) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                    </otherwise>
+                </choose>
+            GROUP BY pi.supplier_id
+        ) in_amounts ON s.id = in_amounts.supplier_id
+        LEFT JOIN (
+            SELECT pr.supplier_id, SUM(pr.total_amount) AS amt
+            FROM wms_purchase_return pr
+            WHERE pr.del_flag = 0
+                AND pr.status = '1'
+                <choose>
+                    <when test="startDate != null and endDate != null">
+                        AND DATE(pr.create_time) BETWEEN #{startDate} AND #{endDate}
+                    </when>
+                    <otherwise>
+                        AND DATE(pr.create_time) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                    </otherwise>
+                </choose>
+            GROUP BY pr.supplier_id
+        ) return_amounts ON s.id = return_amounts.supplier_id
+        LEFT JOIN (
+            SELECT supplier_id, SUM(ap_amount) AS amt
+            FROM wms_accounts_payable
+            WHERE del_flag = 0
+                AND ap_status = '0'
+            GROUP BY supplier_id
+        ) ap_totals ON s.id = ap_totals.supplier_id
+        LEFT JOIN (
+            SELECT pi.supplier_id, SUM(pi.paid_amount) AS amt
+            FROM wms_purchase_in pi
+            WHERE pi.del_flag = 0
+                <choose>
+                    <when test="startDate != null and endDate != null">
+                        AND DATE(pi.create_time) BETWEEN #{startDate} AND #{endDate}
+                    </when>
+                    <otherwise>
+                        AND DATE(pi.create_time) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                    </otherwise>
+                </choose>
+            GROUP BY pi.supplier_id
+        ) paid_totals ON s.id = paid_totals.supplier_id
+        LEFT JOIN (
+            SELECT po.supplier_id, AVG(po_item.price) AS price
+            FROM wms_purchase_order_item po_item
+            INNER JOIN wms_purchase_order po ON po_item.purchase_order_id = po.id
+            WHERE po.del_flag = 0 AND po_item.del_flag = 0
+                <choose>
+                    <when test="startDate != null and endDate != null">
+                        AND DATE(po.create_time) BETWEEN #{startDate} AND #{endDate}
+                    </when>
+                    <otherwise>
+                        AND DATE(po.create_time) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                    </otherwise>
+                </choose>
+            GROUP BY po.supplier_id
+        ) avg_prices ON s.id = avg_prices.supplier_id
+        LEFT JOIN wms_purchase_order po ON s.id = po.supplier_id AND po.del_flag = 0
+        WHERE s.del_flag = 0
+        GROUP BY s.id, s.supplier_code, s.supplier_name, s.contact, s.phone,
+                 order_counts.cnt, order_amounts.amt, in_amounts.amt, return_amounts.amt,
+                 ap_totals.amt, paid_totals.amt, avg_prices.price
+        HAVING COALESCE(order_amounts.amt, 0) > 0 OR COALESCE(in_amounts.amt, 0) > 0
+        ORDER BY netPurchase DESC
+    </select>
+
+</mapper>

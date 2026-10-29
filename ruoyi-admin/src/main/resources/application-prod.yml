@@ -1,0 +1,165 @@
+# 生产环境配置 - 服务器部署专用
+# 使用方式：java -jar ruoyi-admin.jar --spring.profiles.active=prod
+
+ruoyi:
+  name: RuoYi
+  version: 3.9.1
+  copyrightYear: 2026
+  profile: /app/uploadPath
+  addressEnabled: false
+  captchaType: math
+
+server:
+  port: 8080
+  servlet:
+    context-path: /
+  tomcat:
+    uri-encoding: UTF-8
+    accept-count: 1000
+    threads:
+      max: 800
+      min-spare: 100
+
+logging:
+  level:
+    com.ruoyi: info
+    org.springframework: warn
+  file:
+    name: /app/logs/ruoyi.log
+
+user:
+  password:
+    maxRetryCount: 5
+    lockTime: 10
+
+spring:
+  main:
+    allow-circular-dependencies: true
+  messages:
+    basename: i18n/messages
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    druid:
+      master:
+
+        url: jdbc:mysql://localhost:65376/ry-vue?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=GMT%2B8
+        username: root
+        password: 123456
+      slave:
+        enabled: false
+      initialSize: 5
+      minIdle: 10
+      maxActive: 20
+      maxWait: 60000
+      connectTimeout: 30000
+      socketTimeout: 60000
+      timeBetweenEvictionRunsMillis: 60000
+      minEvictableIdleTimeMillis: 300000
+      maxEvictableIdleTimeMillis: 900000
+      validationQuery: SELECT 1 FROM DUAL
+      testWhileIdle: true
+      testOnBorrow: false
+      testOnReturn: false
+      webStatFilter:
+        enabled: true
+      statViewServlet:
+        enabled: true
+        allow: 127.0.0.1
+        url-pattern: /druid/*
+        login-username: admin
+        login-password: Admin@Pass123
+      filter:
+        stat:
+          enabled: true
+          log-slow-sql: true
+          slow-sql-millis: 1000
+          merge-sql: true
+        wall:
+          config:
+            multi-statement-allow: true
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 20MB
+  devtools:
+    restart:
+      enabled: false
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+      password: 123456
+      timeout: 10s
+      lettuce:
+        pool:
+          min-idle: 0
+          max-idle: 8
+          max-active: 8
+          max-wait: -1ms
+
+token:
+  header: Authorization
+  secret: atydjytt5i9f7tydjytt5wxtydjytt5i9pz
+  expireTime: 129600
+
+mybatis:
+  typeAliasesPackage: com.ruoyi.**.domain
+  mapperLocations: classpath*:mapper/**/*Mapper.xml
+  configLocation: classpath:mybatis/mybatis-config.xml
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    db-config:
+      id-type: auto
+  mapper-locations: classpath*:mapper/**/*Mapper.xml
+  type-aliases-package: com.ruoyi.**.domain
+
+springdoc:
+  api-docs:
+    enabled: false
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    tags-sorter: alpha
+  group-configs:
+    - group: 'default'
+      display-name: '系统模块'
+      paths-to-match: '/**'
+      packages-to-scan: com.ruoyi.web.controller.tool
+
+referer:
+  enabled: false
+  allowed-domains: your-domain.com,www.your-domain.com
+
+xss:
+  enabled: true
+  excludes: /system/notice
+  urlPatterns: /system/*,/monitor/*,/tool/*
+
+ai:
+  service:
+    enabled: true
+    qwen:
+      api-key: sk-******************
+      api-url: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+      model: qwen3.6-flash
+      max-tokens: 2000
+      temperature: 0.7
+# 云打印配置
+cloud:
+  print:
+    enabled: false
+    endpoint:
+    app-id:
+    printer-code:
+    api-key:
+    api-key-header: X-API-Key
+    copies: 1
+    connect-timeout-ms: 5000
+    read-timeout-ms: 10000

@@ -1,0 +1,256 @@
+/* =====================================================================
+ * PC 打印样式 — 与移动端 systemPrint.js 完全一致
+ * 字体、颜色、边框、间距、列宽、对齐等逐项对齐
+ * =================================================================== */
+
+/* — 屏幕预览容器（仅预览时可见，打印时隐藏） — */
+.print-bill-page {
+  min-height: 100%;
+  padding: 24px;
+  background: #eef2f6;
+}
+
+.print-bill-pages {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.print-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+/* — 纸张（屏幕预览） — */
+.print-bill-sheet {
+  width: 210mm;
+  min-height: auto;
+  margin: 0 auto;
+  padding: 20px 30px 30px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  /* 与移动端 body 样式完全一致 */
+  color: #000;
+  font-family: "SimHei", "Microsoft YaHei", "PingFang SC", sans-serif;
+  font-size: 9pt;
+  line-height: 1.4;
+  box-sizing: border-box;
+}
+
+.print-bill-sheet * {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.print-bill-sheet:not(:last-child) {
+  page-break-after: always;
+  break-after: page;
+}
+
+/* — 公司抬头 — */
+.print-bill-head-top {
+  position: relative;
+  text-align: center;
+  padding-bottom: 6pt;
+  border-bottom: 1px solid #000;
+  margin-bottom: 0;
+}
+
+.print-bill-head-center {
+  text-align: center;
+}
+
+.print-bill-head-left {
+  text-align: left;
+}
+
+.print-bill-head-company {
+  font-size: 16pt;
+  font-weight: 700;
+}
+
+.print-bill-head-title {
+  font-size: 13pt;
+  margin-top: 4pt;
+}
+
+.print-bill-head-barcode {
+  position: absolute;
+  right: 0;
+  top: 0;
+  text-align: right;
+  line-height: 0;
+}
+
+/* — 单据信息（编号 + 日期）— */
+.print-bill-head-meta {
+  width: 100%;
+  font-size: 10pt;
+  color: #000;
+  margin: 4pt 0 2pt;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+/* — 明细表格 — */
+.print-bill-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0;
+  font-size: 9pt;
+  table-layout: fixed;
+}
+
+.print-bill-table th,
+.print-bill-table td {
+  border: 1px solid #888;
+  padding: 4pt 5pt;
+  vertical-align: top;
+  line-height: 1.4;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* 表头各列对齐方式与移动端一致 */
+.print-bill-table th {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.print-bill-table th.center { text-align: center; }
+.print-bill-table th.left { text-align: left; }
+.print-bill-table th.right { text-align: right; }
+
+.print-bill-table td.center { text-align: center; }
+.print-bill-table td.right { text-align: right; white-space: nowrap; }
+.print-bill-table td.left { text-align: left; }
+
+/* 商品名称 */
+.print-bill-table .name-main {
+  font-size: 9pt;
+}
+
+.print-bill-table .sku-sub {
+  font-size: 8pt;
+  color: #555;
+  margin-top: 1pt;
+}
+
+/* 合计行 */
+.print-bill-summary-row {
+  font-weight: 600;
+}
+
+.print-bill-empty {
+  text-align: center;
+  color: #999;
+  padding: 12px 0;
+}
+
+/* — 底部信息（备注 / 地址 / 电话） — */
+.print-bill-footer {
+  margin-top: 14pt;
+  font-size: 10pt;
+  color: #000;
+}
+
+.print-bill-info-line {
+  margin: 2pt 0;
+}
+
+/* — 响应式 — */
+@media (max-width: 900px) {
+  .print-bill-page {
+    padding: 12px;
+  }
+
+  .print-bill-sheet {
+    width: 100%;
+    min-height: auto;
+    padding: 12px;
+  }
+}
+
+/* — 打印媒体 — */
+@media print {
+  /* margin:0 消除浏览器默认页眉页脚（时间/URL/页码） */
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  html,
+  body {
+    background: #fff;
+    height: auto !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .print-toolbar,
+  .navbar,
+  .tags-view-container,
+  .fixed-header,
+  .el-breadcrumb,
+  .right-panel,
+  .hamburger-container,
+  .sidebar-container,
+  .copyright {
+    display: none !important;
+  }
+
+  .print-bill-pages {
+    gap: 0;
+  }
+
+  .app-wrapper,
+  .main-container,
+  .app-main,
+  .print-bill-page {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+
+  .fixed-header + .app-main,
+  .main-container:has(.fixed-header) {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* 打印时纸张内边距 */
+  .print-bill-sheet {
+    width: 100%;
+    min-height: auto;
+    margin: 0;
+    padding: 20px 30px 30px;
+    box-shadow: none;
+  }
+
+  .print-bill-table {
+    table-layout: fixed;
+    width: 100%;
+  }
+
+  .print-bill-table thead {
+    display: table-header-group;
+  }
+
+  .print-bill-table tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .print-bill-footer {
+    page-break-inside: avoid;
+  }
+}

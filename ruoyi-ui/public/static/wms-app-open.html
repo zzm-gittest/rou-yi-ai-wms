@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>打开羽辽 WMS</title>
+    <link rel="icon" type="image/png" href="https://sysfile-1257741456.cos.ap-guangzhou.myqcloud.com/zhicun_wms/logo.png?imageMogr2/quality/80">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-size: 15px;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f7fa;
+            padding: 24px 16px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .card {
+            max-width: 420px;
+            width: 100%;
+            background: #fff;
+            border-radius: 12px;
+            padding: 28px 20px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,.06);
+        }
+        h1 { font-size: 18px; margin-bottom: 12px; color: #1a1a1a; }
+        p { color: #666; margin-bottom: 16px; }
+        a.btn {
+            display: inline-block;
+            padding: 12px 28px;
+            background: #1677ff;
+            color: #fff !important;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+        code {
+            display: block;
+            margin-top: 16px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 6px;
+            font-size: 12px;
+            word-break: break-all;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1>羽辽 WMS</h1>
+    <p id="msg">正在打开 App…</p>
+    <a id="retry" class="btn" href="#" style="display:none">点此打开 App</a>
+    <code id="deeplink" style="display:none"></code>
+</div>
+<script>
+(function () {
+    var q = new URLSearchParams(location.search);
+    var scheme = (q.get('scheme') || 'yuliaowms').trim();
+    var path = (q.get('path') || 'subpackages/sales/order-detail').trim().replace(/^\//, '');
+    var id = q.get('id');
+    var imSsoTicket = (q.get('imSsoTicket') || '').trim();
+    var deep = scheme + '://' + path;
+    if (id) {
+        deep += (deep.indexOf('?') >= 0 ? '&' : '?') + 'id=' + encodeURIComponent(id);
+    }
+    if (imSsoTicket) {
+        deep += (deep.indexOf('?') >= 0 ? '&' : '?') + 'imSsoTicket=' + encodeURIComponent(imSsoTicket);
+    }
+    var retry = document.getElementById('retry');
+    var msg = document.getElementById('msg');
+    var code = document.getElementById('deeplink');
+    retry.href = deep;
+    retry.style.display = 'inline-block';
+    code.textContent = deep;
+    code.style.display = 'block';
+    try {
+        window.location.replace(deep);
+    } catch (e) {
+        msg.textContent = '请点击下方按钮打开 App';
+    }
+    setTimeout(function () {
+        msg.textContent = '若未自动跳转，请确认已安装羽辽 WMS App，并点击下方按钮重试。';
+    }, 1200);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+import request from '@/utils/request'
+
+// 查询客户分页列表
+export function pageCustomer(query) {
+  return request({
+    url: '/wms/customer/page',
+    method: 'get',
+    params: query
+  })
+}
+
+// 查询客户列表（不分页）
+export function listCustomer() {
+  return request({
+    url: '/wms/customer/list',
+    method: 'get'
+  })
+}
+
+// 查询客户详细
+export function getCustomer(id) {
+  return request({
+    url: '/wms/customer/' + id,
+    method: 'get'
+  })
+}
+
+// 新增客户
+export function addCustomer(data) {
+  return request({
+    url: '/wms/customer',
+    method: 'post',
+    data: data
+  })
+}
+
+// 修改客户
+export function updateCustomer(data) {
+  return request({
+    url: '/wms/customer',
+    method: 'put',
+    data: data
+  })
+}
+
+// 删除客户
+export function delCustomer(id) {
+  return request({
+    url: '/wms/customer/' + id,
+    method: 'delete'
+  })
+}

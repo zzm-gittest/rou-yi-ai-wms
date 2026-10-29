@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.wms.mapper.report.WmsStockReportMapper">
+
+    <!-- 查询库存进销存报表 -->
+    <select id="queryStockPsiReport" resultType="com.ruoyi.wms.domain.report.vo.StockPsiReportVO">
+        SELECT
+            w.warehouse_name AS warehouseName,
+            sku.sku_code AS goodsCode,
+            COALESCE(spu.goods_name, sku.sku_name) AS goodsName,
+            sku.spec,
+            sku.unit,
+            COALESCE(begin_qty.qty, 0) AS beginQty,
+            COALESCE(begin_amt.amt, 0) AS beginAmount,
+            COALESCE(in_qty.qty, 0) AS inQty,
+            COALESCE(in_amt.amt, 0) AS inAmount,
+            COALESCE(out_qty.qty, 0) AS outQty,
+            COALESCE(out_amt.amt, 0) AS outAmount,
+            COALESCE(end_qty.qty, 0) AS endQty,
+            COALESCE(end_amt.amt, 0) AS endAmount
+        FROM wms_goods_sku sku
+        LEFT JOIN wms_goods spu ON sku.goods_id = spu.id
+        CROSS JOIN wms_warehouse w
+        WHERE w.del_flag = 0 AND sku.del_flag = 0
+            <if test="categoryIds != null and categoryIds.size() > 0">
+                AND spu.category_id IN
+                <foreach collection="categoryIds" item="id" open="(" separator="," close=")">
+                    #{id}
+                </foreach>
+            </if>
+            <if test="warehouseIds != null and warehouseIds.size() > 0">
+                AND w.id IN
+                <foreach collection="warehouseIds" item="id" open="(" separator="," close=")">
+                    #{id}
+                </foreach>
+            </if>
+
+            -- 期初数量（在统计日期之前的库存）
+            LEFT JOIN (
+                SELECT st.warehouse_id, st.sku_id, st.quantity AS qty
+                FROM wms_stock st
+                WHERE st.del_flag = 0
+            ) begin_qty ON w.id = begin_qty.warehouse_id AND sku.id = begin_qty.sku_id
+
+            -- 期初金额
+            LEFT JOIN (
+                SELECT st.warehouse_id, st.sku_id,
+                       st.quantity * COALESCE(sku.cost_price, 0) AS amt
+                FROM wms_stock st
+                INNER JOIN wms_goods_sku s ON st.sku_id = s.id
+                WHERE st.del_flag = 0
+            ) begin_amt ON w.id = begin_amt.warehouse_id AND sku.id = begin_amt.sku_id
+
+            -- 入库数量
+            LEFT JOIN (
+                SELECT pi.warehouse_id, pii.sku_id, SUM(pii.quantity) AS qty
+                FROM wms_purchase_in_item pii
+                INNER JOIN wms_purchase_in pi ON pii.purchase_in_id = pi.id
+                WHERE pi.del_flag = 0 AND pii.del_flag = 0
+                    AND pi.status = '1'
+                    <choose>
+                        <when test="startDate != null and endDate != null">
+                            AND DATE(pi.create_time) BETWEEN #{startDate} AND #{endDate}
+                        </when>
+                        <otherwise>
+                            AND DATE(pi.create_time) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                        </otherwise>
+                    </choose>
+                GROUP BY pi.warehouse_id, pii.sku_id
+            ) in_qty ON w.id = in_qty.warehouse_id AND sku.id = in_qty.sku_id
+
+            -- 入库金额
+            LEFT JOIN (
+                SELECT pi.warehouse_id, pii.sku_id, SUM(pii.sub_total) AS amt
+                FROM wms_purchase_in_item pii
+                INNER JOIN wms_purchase_in pi ON pii.purchase_in_id = pi.id
+                WHERE pi.del_flag = 0 AND pii.del_flag = 0
+                    AND pi.status = '1'
+                    <choose>
+                        <when test="startDate != null and endDate != null">
+                            AND DATE(pi.create_time) BETWEEN #{startDate} AND #{endDate}
+                        </when>
+                        <otherwise>
+                            AND DATE(pi.create_time) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                        </otherwise>
+                    </choose>
+                GROUP BY pi.warehouse_id, pii.sku_id
+            ) in_amt ON w.id = in_amt.warehouse_id AND sku.id = in_amt.sku_id
+
+            -- 出库数量
+            LEFT JOIN (
+                SELECT so.warehouse_id, soi.sku_id, SUM(soi.quantity) AS qty
+                FROM wms_sales_out_item soi
+                INNER JOIN wms_sales_out so ON soi.sales_out_id = so.id
+                WHERE so.del_flag = 0 AND soi.del_flag = 0
+                    AND so.status = '1'
+                    <choose>
+                        <when test="startDate != null and endDate != null">
+                            AND DATE(so.create_time) BETWEEN #{startDate} AND #{endDate}
+                        </when>
+                        <otherwise>
+                            AND DATE(so.create_time) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                        </otherwise>
+                    </choose>
+                GROUP BY so.warehouse_id, soi.sku_id
+            ) out_qty ON w.id = out_qty.warehouse_id AND sku.id = out_qty.sku_id
+
+            -- 出库金额
+            LEFT JOIN (
+                SELECT so.warehouse_id, soi.sku_id, SUM(soi.sub_total) AS amt
+                FROM wms_sales_out_item soi
+                INNER JOIN wms_sales_out so ON soi.sales_out_id = so.id
+                WHERE so.del_flag = 0 AND soi.del_flag = 0
+                    AND so.status = '1'
+                    <choose>
+                        <when test="startDate != null and endDate != null">
+                            AND DATE(so.create_time) BETWEEN #{startDate} AND #{endDate}
+                        </when>
+                        <otherwise>
+                            AND DATE(so.create_time) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                        </otherwise>
+                    </choose>
+                GROUP BY so.warehouse_id, soi.sku_id
+            ) out_amt ON w.id = out_amt.warehouse_id AND sku.id = out_amt.sku_id
+
+            -- 期末数量
+            LEFT JOIN (
+                SELECT st.warehouse_id, st.sku_id, st.quantity AS qty
+                FROM wms_stock st
+                WHERE st.del_flag = 0
+            ) end_qty ON w.id = end_qty.warehouse_id AND sku.id = end_qty.sku_id
+
+            -- 期末金额
+            LEFT JOIN (
+                SELECT st.warehouse_id, st.sku_id,
+                       st.quantity * COALESCE(sku.cost_price, 0) AS amt
+                FROM wms_stock st
+                INNER JOIN wms_goods_sku s ON st.sku_id = s.id
+                WHERE st.del_flag = 0
+            ) end_amt ON w.id = end_amt.warehouse_id AND sku.id = end_amt.sku_id
+
+        WHERE (COALESCE(in_qty.qty, 0) > 0 OR COALESCE(out_qty.qty, 0) > 0 OR COALESCE(end_qty.qty, 0) > 0)
+        ORDER BY w.warehouse_name, sku.sku_code
+    </select>
+
+</mapper>

@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.wms.mapper.WmsStockMapper">
+
+    <resultMap type="com.ruoyi.wms.domain.WmsStock" id="WmsStockResult">
+        <id     property="id"            column="id"            />
+        <result property="tenantId"      column="tenant_id"     />
+        <result property="warehouseId"   column="warehouse_id"  />
+        <result property="skuId"         column="sku_id"        />
+        <result property="goodsId"       column="goods_id"      />
+        <result property="quantity"      column="quantity"      />
+        <result property="costPrice"     column="cost_price"    />
+        <result property="updateTime"    column="update_time"   />
+    </resultMap>
+
+    <resultMap type="com.ruoyi.wms.domain.vo.stock.WmsStockExportVO" id="WmsStockExportVOResult">
+        <result property="warehouseName" column="warehouse_name"/>
+        <result property="goodsCode"     column="goods_code"    />
+        <result property="goodsName"     column="goods_name"    />
+        <result property="skuCode"       column="sku_code"      />
+        <result property="skuName"       column="sku_name"      />
+        <result property="specInfo"      column="spec_info"     />
+        <result property="unitName"      column="unit_name"     />
+        <result property="quantity"      column="quantity"      />
+        <result property="costPrice"     column="cost_price"    />
+        <result property="amount"        column="amount"        />
+        <result property="updateTime"    column="update_time"   />
+    </resultMap>
+
+    <resultMap type="com.ruoyi.wms.domain.vo.stock.WmsStockRespVO" id="WmsStockRespVOResult">
+        <id     property="id"            column="id"            />
+        <result property="warehouseId"   column="warehouse_id"  />
+        <result property="warehouseName" column="warehouse_name"/>
+        <result property="skuId"         column="sku_id"        />
+        <result property="skuCode"       column="sku_code"      />
+        <result property="skuName"       column="sku_name"      />
+        <result property="goodsId"       column="goods_id"      />
+        <result property="goodsCode"     column="goods_code"    />
+        <result property="goodsName"     column="goods_name"    />
+        <result property="unitName"      column="unit_name"     />
+        <result property="specInfo"      column="spec_info"     />
+        <result property="quantity"      column="quantity"      />
+        <result property="costPrice"     column="cost_price"    />
+        <result property="purchasePrice"  column="purchase_price"/>
+        <result property="salePrice"      column="sale_price"    />
+        <result property="wholesalePrice" column="wholesale_price"/>
+        <result property="amount"         column="amount"        />
+        <result property="updateTime"    column="update_time"   />
+    </resultMap>
+
+    <select id="selectStockPage" resultMap="WmsStockRespVOResult">
+        SELECT
+            s.id,
+            s.warehouse_id,
+            w.warehouse_name,
+            s.sku_id,
+            sku.sku_code,
+            sku.sku_name,
+            s.goods_id,
+            g.goods_code,
+            g.goods_name,
+            u.unit_name,
+            sku.spec_info,
+            s.quantity,
+            s.cost_price,
+            sku.purchase_price,
+            sku.sale_price,
+            sku.wholesale_price,
+            (s.quantity * s.cost_price) AS amount,
+            s.update_time
+        FROM wms_stock s
+        LEFT JOIN wms_warehouse w ON s.warehouse_id = w.id
+        LEFT JOIN wms_goods_sku sku ON s.sku_id = sku.id
+        LEFT JOIN wms_goods g ON s.goods_id = g.id
+        LEFT JOIN wms_unit u ON sku.unit_id = u.id
+        WHERE 1=1
+        <if test="reqVO.warehouseId != null">
+            AND s.warehouse_id = #{reqVO.warehouseId}
+        </if>
+        <if test="reqVO.goodsCode != null and reqVO.goodsCode != ''">
+            AND g.goods_code LIKE CONCAT('%', #{reqVO.goodsCode}, '%')
+        </if>
+        <if test="reqVO.goodsName != null and reqVO.goodsName != ''">
+            AND g.goods_name LIKE CONCAT('%', #{reqVO.goodsName}, '%')
+        </if>
+        <if test="reqVO.skuCode != null and reqVO.skuCode != ''">
+            AND sku.sku_code LIKE CONCAT('%', #{reqVO.skuCode}, '%')
+        </if>
+        <if test="reqVO.lowStock != null and reqVO.lowStock">
+            AND s.quantity &lt; 10
+        </if>
+        ORDER BY s.update_time DESC
+    </select>
+
+    <select id="selectStockExportList" resultMap="WmsStockExportVOResult">
+        SELECT
+            w.warehouse_name,
+            g.goods_code,
+            g.goods_name,
+            sku.sku_code,
+            sku.sku_name,
+            sku.spec_info,
+            u.unit_name,
+            s.quantity,
+            s.cost_price,
+            (s.quantity * s.cost_price) AS amount,
+            s.update_time
+        FROM wms_stock s
+        LEFT JOIN wms_warehouse w ON s.warehouse_id = w.id
+        LEFT JOIN wms_goods_sku sku ON s.sku_id = sku.id
+        LEFT JOIN wms_goods g ON s.goods_id = g.id
+        LEFT JOIN wms_unit u ON sku.unit_id = u.id
+        WHERE 1=1
+        <if test="reqVO.warehouseId != null">
+            AND s.warehouse_id = #{reqVO.warehouseId}
+        </if>
+        <if test="reqVO.goodsCode != null and reqVO.goodsCode != ''">
+            AND g.goods_code LIKE CONCAT('%', #{reqVO.goodsCode}, '%')
+        </if>
+        <if test="reqVO.goodsName != null and reqVO.goodsName != ''">
+            AND g.goods_name LIKE CONCAT('%', #{reqVO.goodsName}, '%')
+        </if>
+        <if test="reqVO.skuCode != null and reqVO.skuCode != ''">
+            AND sku.sku_code LIKE CONCAT('%', #{reqVO.skuCode}, '%')
+        </if>
+        <if test="reqVO.lowStock != null and reqVO.lowStock">
+            AND s.quantity &lt; 10
+        </if>
+        ORDER BY s.update_time DESC
+    </select>
+
+    <select id="selectStockById" resultMap="WmsStockRespVOResult">
+        SELECT
+            s.id,
+            s.warehouse_id,
+            w.warehouse_name,
+            s.sku_id,
+            sku.sku_code,
+            sku.sku_name,
+            s.goods_id,
+            g.goods_code,
+            g.goods_name,
+            u.unit_name,
+            sku.spec_info,
+            s.quantity,
+            s.cost_price,
+            sku.purchase_price,
+            sku.sale_price,
+            sku.wholesale_price,
+            (s.quantity * s.cost_price) AS amount,
+            s.update_time
+        FROM wms_stock s
+        LEFT JOIN wms_warehouse w ON s.warehouse_id = w.id
+        LEFT JOIN wms_goods_sku sku ON s.sku_id = sku.id
+        LEFT JOIN wms_goods g ON s.goods_id = g.id
+        LEFT JOIN wms_unit u ON sku.unit_id = u.id
+        WHERE s.id = #{id}
+    </select>
+
+    <!-- 查询库存Top列表 -->
+    <select id="selectStockTop" resultMap="WmsStockRespVOResult">
+        SELECT
+            s.id,
+            s.warehouse_id,
+            w.warehouse_name,
+            s.sku_id,
+            sku.sku_code,
+            sku.sku_name,
+            s.goods_id,
+            g.goods_code,
+            g.goods_name,
+            u.unit_name,
+            sku.spec_info,
+            s.quantity,
+            s.cost_price,
+            (s.quantity * s.cost_price) AS amount,
+            s.update_time
+        FROM wms_stock s
+        LEFT JOIN wms_warehouse w ON s.warehouse_id = w.id
+        LEFT JOIN wms_goods_sku sku ON s.sku_id = sku.id
+        LEFT JOIN wms_goods g ON s.goods_id = g.id
+        LEFT JOIN wms_unit u ON sku.unit_id = u.id
+        WHERE s.quantity > 0
+        ORDER BY s.quantity DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 查询库存预警列表 -->
+    <select id="selectStockWarning" resultMap="WmsStockRespVOResult">
+        SELECT
+            s.id,
+            s.warehouse_id,
+            w.warehouse_name,
+            s.sku_id,
+            sku.sku_code,
+            sku.sku_name,
+            s.goods_id,
+            g.goods_code,
+            g.goods_name,
+            u.unit_name,
+            sku.spec_info,
+            s.quantity,
+            s.cost_price,
+            (s.quantity * s.cost_price) AS amount,
+            s.update_time
+        FROM wms_stock s
+        LEFT JOIN wms_warehouse w ON s.warehouse_id = w.id
+        LEFT JOIN wms_goods_sku sku ON s.sku_id = sku.id
+        LEFT JOIN wms_goods g ON s.goods_id = g.id
+        LEFT JOIN wms_unit u ON sku.unit_id = u.id
+        WHERE s.quantity &lt; #{threshold}
+        ORDER BY s.quantity ASC
+        <if test="limit > 0">
+            LIMIT #{limit}
+        </if>
+    </select>
+
+    <!-- 按仓库统计库存 -->
+    <select id="selectWarehouseStockSummary" resultMap="WmsStockRespVOResult">
+        SELECT
+            w.id AS warehouse_id,
+            w.warehouse_name,
+            SUM(s.quantity) AS quantity
+        FROM wms_warehouse w
+        LEFT JOIN wms_stock s ON w.id = s.warehouse_id
+        GROUP BY w.id, w.warehouse_name
+        ORDER BY quantity DESC
+    </select>
+
+</mapper>

@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>毛利计算器 | 羽辽 WMS</title>
+    <meta name="description" content="羽辽 WMS 毛利计算器，快速计算销售毛利、毛利率、进销差价，帮助批发零售、小店老板判断定价和库存。">
+    <link rel="icon" type="image/png" href="https://sysfile-1257741456.cos.ap-guangzhou.myqcloud.com/zhicun_wms/logo.png?imageMogr2/quality/80">
+    <style>
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: #f4f7fb; color: #222; }
+        body { min-height: 100vh; }
+        .container { max-width: 720px; margin: 0 auto; padding: 20px; }
+
+        .card { background: #fff; border-radius: 20px; box-shadow: 0 18px 40px rgba(7,34,65,.08); padding: 24px; margin-bottom: 20px; }
+        h1 { margin: 0 0 10px; font-size: 28px; line-height: 1.2; color: #15233b; }
+        .subtitle { color: #526174; font-size: 15px; line-height: 1.7; margin-bottom: 18px; }
+
+        .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); }
+        .field { display: flex; flex-direction: column; }
+        .field label { font-size: 14px; color: #4c627b; margin-bottom: 8px; }
+
+        input[type="text"] { width: 100%; border: 1px solid #dce1e8; border-radius: 12px; padding: 12px 14px; font-size: 15px; color: #1e293b; background: #fbfdff; }
+        input[type="text"]:focus { outline: none; border-color: #1677ff; box-shadow: 0 0 0 4px rgba(22,119,255,.08); }
+        .button { width: 100%; padding: 14px 16px; border: none; border-radius: 12px; background: #1677ff; color: #fff; font-size: 16px; cursor: pointer; transition: background .2s; }
+        .button:hover { background: #145fd0; }
+
+        .result { display: grid; gap: 14px; margin-top: 20px; }
+        .result-item { padding: 18px 18px; border-radius: 16px; background: #f8fbff; border: 1px solid #e6eefb; }
+        .result-item strong { display: block; margin-bottom: 8px; color: #1e293b; font-size: 14px; }
+        .result-item span { color: #0a69ff; font-size: 24px; font-weight: 700; }
+
+        .note { color: #475569; font-size: 14px; line-height: 1.75; margin-top: 12px; }
+        .highlight { color: #0f7cff; }
+        .actions { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+        .action-link { display: inline-block; text-decoration: none; text-align: center; padding: 14px 18px; border-radius: 14px; font-size: 15px; font-weight: 600; }
+        .action-primary { background: #1677ff; color: #fff; }
+        .action-secondary { background: #f4f6fb; color: #1f2937; border: 1px solid #d7e1f2; }
+
+        .tips { font-size: 13px; color: #5d6c83; margin-top: 16px; }
+        .badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 999px; font-size: 12px; background: #e8f2ff; color: #1760d7; }
+        .top-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 22px; }
+        .top-bar img { width: 36px; height: 36px; border-radius: 12px; }
+        .top-bar div { min-width: 0; }
+        .top-bar .title { font-size: 14px; color: #49627f; }
+        .top-bar .tag { font-size: 12px; color: #5d7a99; }
+        .cta-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+        .cta-row a { flex: 1; }
+
+        .save-btn { width: 100%; padding: 13px 16px; border: 1px dashed #1677ff; border-radius: 12px; background: #f3f8ff; color: #1760d7; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 14px; transition: all .2s; }
+        .save-btn:hover { background: #e8f2ff; }
+        .records-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .records-head h2 { margin: 0; font-size: 18px; color: #15233b; }
+        .records-clear { font-size: 13px; color: #98a3b5; cursor: pointer; background: none; border: none; }
+        .records { display: grid; gap: 10px; margin-top: 12px; }
+        .record-item { border: 1px solid #e6eefb; border-radius: 14px; padding: 12px 14px; background: #f8fbff; font-size: 13px; color: #34465f; }
+        .record-item .rec-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .record-item .rec-name { font-weight: 700; color: #15233b; font-size: 14px; }
+        .record-item .rec-del { color: #b1273a; font-size: 12px; cursor: pointer; background: none; border: none; padding: 0; }
+        .record-item .rec-row { display: flex; flex-wrap: wrap; gap: 12px; color: #51637c; }
+        .record-item .rec-row b { color: #0a69ff; }
+        .record-empty { font-size: 13px; color: #8493a8; padding: 8px 0; }
+
+        @media (max-width: 520px) {
+            .container { padding: 14px; }
+            .card { padding: 18px; }
+            .button, .action-link { font-size: 15px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="card">
+        <div class="top-bar">
+            <img src="https://sysfile-1257741456.cos.ap-guangzhou.myqcloud.com/zhicun_wms/logo.png?imageMogr2/quality/80" alt="羽辽 WMS">
+            <div>
+                <div class="title">羽辽 WMS 毛利计算器</div>
+                <div class="tag">快速判断单笔毛利、毛利率、进销差价</div>
+            </div>
+            <span class="badge">在线使用</span>
+        </div>
+        <h1>算出每笔订单真实毛利</h1>
+        <p class="subtitle">按项目 WMS 订单逻辑计算：订单金额 = 单价×数量−折扣。额外费用仅用于毛利参考，项目目前没有订单税率字段。</p>
+        <div class="grid">
+            <div class="field"><label>销售单价（元）</label><input id="sellPrice" type="text" inputmode="decimal" placeholder="例如 28.5"></div>
+            <div class="field"><label>成本单价（元）</label><input id="costPrice" type="text" inputmode="decimal" placeholder="例如 18.0"></div>
+            <div class="field"><label>数量</label><input id="quantity" type="text" inputmode="decimal" placeholder="例如 120"></div>
+            <div class="field"><label>额外费用（元，可选）</label><input id="extraCost" type="text" inputmode="decimal" placeholder="例如 120"></div>
+            <div class="field"><label>折扣金额（元）</label><input id="discount" type="text" inputmode="decimal" placeholder="例如 0.9"></div>
+        </div>
+        <div class="cta-row">
+            <button class="button" id="calcBtn">立即计算</button>
+            <a class="action-link action-secondary" id="resetBtn" href="javascript:void(0);">清空数据</a>
+        </div>
+        <div class="result" id="resultArea" hidden>
+            <div class="result-item"><strong>总销售额</strong><span id="revenueText">0.00 元</span></div>
+            <div class="result-item"><strong>折扣后应收</strong><span id="receivableText">0.00 元</span></div>
+            <div class="result-item"><strong>总成本（商品成本+额外费用+折扣）</strong><span id="costText">0.00 元</span></div>
+            <div class="result-item"><strong>毛利润</strong><span id="profitText">0.00 元</span></div>
+            <div class="result-item"><strong>毛利率</strong><span id="marginText">0.00 %</span></div>
+            <div class="result-item"><strong>单件进销差价</strong><span id="unitDiffText">0.00 元</span></div>
+        </div>
+        <button type="button" class="save-btn" id="saveBtn">💾 保存这笔毛利记录</button>
+        <div class="actions">
+            <a id="registerLink" class="action-link action-primary" target="_blank" rel="noopener">试用完整版 WMS</a>
+            <a class="action-link action-secondary" href="https://zhicun.site/tools/profit-calculator.html" target="_blank" rel="noopener">复制页面链接，分享给同行</a>
+        </div>
+        <p class="note">提示：这个计算器与项目 WMS 订单逻辑保持一致。它按“订单金额=单价×数量−折扣”计算应收，并将额外费用用于毛利参考。</p>
+    </div>
+    <div class="card">
+        <div class="records-head">
+            <h2>保存的毛利记录</h2>
+            <button type="button" class="records-clear" id="clearRecords">清空记录</button>
+        </div>
+        <p class="note" style="margin-top:0;">记录仅保存在本机浏览器，方便随时回看不同方案的毛利对比。</p>
+        <div class="records" id="recordsArea"></div>
+    </div>
+    <div class="card">
+        <h2>如何使用</h2>
+        <ul class="note">
+            <li>1. 输入商品销售单价、成本单价、数量。</li>
+            <li>2. 输入可选额外费用，作为毛利参考。</li>
+            <li>3. 输入折扣金额，点击“立即计算”。</li>
+            <li>4. 结果显示与项目订单逻辑一致的应收、成本和毛利。</li>
+            <li>5. 想让系统自动记录订单与毛利数据，点击“试用完整版 WMS”。</li>
+        </ul>
+    </div>
+</div>
+<script>
+    const parseNumber = value => {
+        const normalized = String(value).trim().replace(/，/g, '.').replace(/[^0-9.\-]/g, '');
+        const number = parseFloat(normalized);
+        return Number.isFinite(number) ? number : 0;
+    };
+    const formatMoney = value => {
+        return Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+    const formatRate = value => {
+        return Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' %';
+    };
+    const query = new URLSearchParams(window.location.search);
+    let lastResult = null;
+    const calcBtn = document.getElementById('calcBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const resultArea = document.getElementById('resultArea');
+    const registerLink = document.getElementById('registerLink');
+    const setResult = ({ revenue, receivable, totalCost, profit, margin, unitDiff }) => {
+        document.getElementById('revenueText').textContent = formatMoney(revenue) + ' 元';
+        document.getElementById('receivableText').textContent = formatMoney(receivable) + ' 元';
+        document.getElementById('costText').textContent = formatMoney(totalCost) + ' 元';
+        document.getElementById('profitText').textContent = formatMoney(profit) + ' 元';
+        document.getElementById('marginText').textContent = formatRate(margin);
+        document.getElementById('unitDiffText').textContent = formatMoney(unitDiff) + ' 元';
+    };
+    const calculate = () => {
+        const sellPrice = parseNumber(document.getElementById('sellPrice').value);
+        const costPrice = parseNumber(document.getElementById('costPrice').value);
+        const quantity = parseNumber(document.getElementById('quantity').value);
+        const extraCost = parseNumber(document.getElementById('extraCost').value);
+        const discount = parseNumber(document.getElementById('discount').value);
+
+        const revenue = sellPrice * quantity;
+        const baseCost = costPrice * quantity;
+        const discountAmount = discount;
+        const receivable = Math.max(revenue - discountAmount, 0);
+        const totalCost = baseCost + extraCost + discountAmount;
+        const profit = receivable - totalCost;
+        const margin = receivable === 0 ? 0 : (profit / receivable) * 100;
+        const unitDiff = sellPrice - costPrice;
+
+        lastResult = { sellPrice, costPrice, quantity, extraCost, discount, revenue, receivable, totalCost, profit, margin, unitDiff };
+        setResult({ revenue, receivable, totalCost, profit, margin, unitDiff });
+        resultArea.hidden = false;
+    };
+
+    calcBtn.addEventListener('click', event => {
+        event.preventDefault();
+        calculate();
+    });
+    resetBtn.addEventListener('click', event => {
+        event.preventDefault();
+        ['sellPrice', 'costPrice', 'quantity', 'extraCost', 'discount'].forEach(id => {
+            document.getElementById(id).value = '';
+        });
+        lastResult = null;
+        resultArea.hidden = true;
+    });
+    registerLink.href = 'https://zhicun.site';
+
+    /* ===== 输入框限制：仅允许数字与最多两位小数 ===== */
+    const numberInputs = ['sellPrice', 'costPrice', 'quantity', 'extraCost', 'discount'].map(id => document.getElementById(id));
+    const sanitizeNumberInput = value => {
+        let v = String(value)
+            .replace(/[\uFF10-\uFF19]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
+            .replace(/[，。]/g, '.')
+            .replace(/[^0-9.]/g, '');
+        const firstDot = v.indexOf('.');
+        if (firstDot !== -1) {
+            v = v.slice(0, firstDot + 1) + v.slice(firstDot + 1).replace(/\./g, '');
+            const parts = v.split('.');
+            if (parts[1] && parts[1].length > 2) {
+                v = parts[0] + '.' + parts[1].slice(0, 2);
+            }
+        }
+        return v;
+    };
+    numberInputs.forEach(input => {
+        input.addEventListener('input', () => {
+            const cleaned = sanitizeNumberInput(input.value);
+            if (cleaned !== input.value) { input.value = cleaned; }
+        });
+    });
+
+
+    /* ===== 保存毛利记录（本地存储） ===== */
+    const RECORD_KEY = 'profit_tool_records';
+    const saveBtn = document.getElementById('saveBtn');
+    const recordsArea = document.getElementById('recordsArea');
+    const clearRecords = document.getElementById('clearRecords');
+    const getRecords = () => {
+        try { const v = JSON.parse(localStorage.getItem(RECORD_KEY)); return Array.isArray(v) ? v : []; }
+        catch (e) { return []; }
+    };
+    const saveRecords = list => localStorage.setItem(RECORD_KEY, JSON.stringify(list));
+    const renderRecords = () => {
+        const list = getRecords();
+        if (!list.length) {
+            recordsArea.innerHTML = '<div class="record-empty">还没有保存的毛利记录，计算后点击“保存这笔毛利记录”即可。</div>';
+            return;
+        }
+        recordsArea.innerHTML = list.map(r =>
+            '<div class="record-item">' +
+                '<div class="rec-top"><span class="rec-name">' + r.title + '</span>' +
+                '<button type="button" class="rec-del" data-id="' + r.id + '">删除</button></div>' +
+                '<div class="rec-row">' +
+                    '<span>应收 <b>' + formatMoney(r.receivable) + '</b> 元</span>' +
+                    '<span>毛利 <b>' + formatMoney(r.profit) + '</b> 元</span>' +
+                    '<span>毛利率 <b>' + formatMoney(r.margin) + '%</b></span>' +
+                '</div>' +
+                '<div class="rec-row" style="margin-top:4px;color:#8493a8;">' + r.time + '</div>' +
+            '</div>'
+        ).join('');
+    };
+    saveBtn.addEventListener('click', () => {
+        if (!lastResult) { alert('请先点击“立即计算”得到结果再保存。'); return; }
+        const list = getRecords();
+        list.unshift({
+            id: Date.now(),
+            title: '单价' + lastResult.sellPrice + ' × 数量' + lastResult.quantity,
+            receivable: lastResult.receivable,
+            profit: lastResult.profit,
+            margin: lastResult.margin,
+            time: new Date().toLocaleString('zh-CN')
+        });
+        saveRecords(list.slice(0, 50));
+        renderRecords();
+    });
+    recordsArea.addEventListener('click', event => {
+        const btn = event.target.closest('.rec-del');
+        if (!btn) return;
+        saveRecords(getRecords().filter(r => String(r.id) !== String(btn.dataset.id)));
+        renderRecords();
+    });
+    clearRecords.addEventListener('click', () => {
+        if (!getRecords().length) return;
+        if (confirm('确定清空全部毛利记录吗？')) { saveRecords([]); renderRecords(); }
+    });
+
+    if (query.get('sellPrice')) { document.getElementById('sellPrice').value = sanitizeNumberInput(query.get('sellPrice')); }
+    if (query.get('costPrice')) { document.getElementById('costPrice').value = sanitizeNumberInput(query.get('costPrice')); }
+    if (query.get('quantity')) { document.getElementById('quantity').value = sanitizeNumberInput(query.get('quantity')); }
+    if (query.get('extraCost')) { document.getElementById('extraCost').value = sanitizeNumberInput(query.get('extraCost')); }
+    if (query.get('discount')) { document.getElementById('discount').value = sanitizeNumberInput(query.get('discount')); }
+    if (query.get('autoCalc') === '1') {
+        calculate();
+    }
+    renderRecords();
+</script>
+</body>
+</html>
+

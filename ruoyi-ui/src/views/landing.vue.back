@@ -1,0 +1,1352 @@
+<template>
+  <div class="landing-page">
+    <!-- 导航栏 -->
+    <header class="header">
+      <div class="header-content">
+        <div class="logo">
+          <span class="logo-icon">📦</span>
+          <span class="logo-text">羽辽WMS <span class="project-tag">个人学习项目</span></span>
+        </div>
+
+        <!-- 汉堡菜单按钮（仅移动端） -->
+        <div class="hamburger-btn" @click="toggleMobileMenu" :class="{'active': mobileMenuOpen}">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+
+        <!-- 导航菜单 -->
+        <nav class="nav" :class="{'mobile-open': mobileMenuOpen}">
+          <a href="#about" class="nav-link" @click="closeMobileMenu">关于</a>
+          <a href="#tech" class="nav-link" @click="closeMobileMenu">技术栈</a>
+          <a href="#features" class="nav-link" @click="closeMobileMenu">功能</a>
+          <a href="#demo" class="nav-link" @click="closeMobileMenu">在线体验</a>
+          <router-link to="/index" class="nav-link admin-link" @click.native="closeMobileMenu">系统登录</router-link>
+        </nav>
+      </div>
+
+      <!-- 移动端遮罩层 -->
+      <div class="mobile-overlay" v-show="mobileMenuOpen" @click="closeMobileMenu"></div>
+    </header>
+
+    <!-- Hero 区域 -->
+    <section class="hero">
+      <div class="hero-content">
+        <div class="hero-badge">
+          <span class="ai-icon">💻</span>
+          <span>个人开发作品 - 学习项目展示</span>
+        </div>
+        <h1 class="hero-title">
+          羽辽WMS
+          <span class="gradient-text">智能仓库管理系统</span>
+        </h1>
+        <p class="hero-subtitle">
+          基于 Spring Boot + Vue3 + AI 的个人学习项目<br>
+          集成语音录入、智能问答等 AI 功能的技术探索作品
+        </p>
+        <div class="hero-buttons">
+          <a href="#demo" class="btn btn-primary">
+            <span class="btn-icon">🎮</span>
+            在线体验
+          </a>
+          <a href="#tech" class="btn btn-secondary">
+            <span class="btn-icon">📖</span>
+            技术介绍
+          </a>
+        </div>
+
+        <!-- 项目简介卡片 -->
+        <div class="ai-demo project-intro">
+          <div class="demo-header">
+            <span class="demo-title">💡 关于本项目</span>
+          </div>
+          <div class="intro-content">
+            <p>这是我在学习全栈开发过程中独立完成的一个仓库管理系统项目。通过这个项目，我实践了从后端API设计、数据库建模到前端页面开发的完整流程，并探索了AI技术在传统业务系统中的应用。</p>
+            <p class="tech-highlights">项目亮点：语音识别开单、AI智能对话操作、实时数据统计</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 关于项目 -->
+    <section id="about" class="section about-section">
+      <div class="section-content">
+        <h2 class="section-title">
+          <span class="section-icon">👋</span>
+          项目说明
+          <span class="section-subtitle">个人学习作品，非商业产品</span>
+        </h2>
+        <div class="about-content">
+          <div class="about-text">
+            <p><strong>羽辽WMS</strong> 是我个人开发并维护的学习项目。作为一名开发者，我通过这个项目来练习和展示全栈开发技能，探索AI技术在企业级应用中的集成方式。</p>
+            <p>本项目仅作为<strong>个人技术作品展示</strong>和<strong>学习交流</strong>使用，不涉及任何商业经营活动。如果您对项目的技术实现感兴趣，欢迎交流讨论！</p>
+          </div>
+          <div class="project-info">
+            <div class="info-item">
+              <span class="info-label">项目类型</span>
+              <span class="info-value">个人学习作品</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">开发目的</span>
+              <span class="info-value">技术学习与展示</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">技术方向</span>
+              <span class="info-value">全栈开发 + AI应用</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 技术栈 -->
+    <section id="tech" class="section tech-section">
+      <div class="section-content">
+        <h2 class="section-title">
+          <span class="section-icon">🛠️</span>
+          技术栈
+          <span class="section-subtitle">项目中使用的主要技术</span>
+        </h2>
+        <div class="tech-grid">
+          <div class="tech-category">
+            <h3>后端技术</h3>
+            <div class="tech-tags">
+              <span class="tech-tag">Spring Boot 3.5</span>
+              <span class="tech-tag">Java 17</span>
+              <span class="tech-tag">MyBatis-Plus</span>
+              <span class="tech-tag">MySQL 8</span>
+              <span class="tech-tag">Redis</span>
+              <span class="tech-tag">DeepSeek AI</span>
+            </div>
+          </div>
+          <div class="tech-category">
+            <h3>前端技术</h3>
+            <div class="tech-tags">
+              <span class="tech-tag">Vue 2</span>
+              <span class="tech-tag">Element UI</span>
+              <span class="tech-tag">ECharts</span>
+              <span class="tech-tag">uni-app</span>
+              <span class="tech-tag">uView UI</span>
+            </div>
+          </div>
+          <div class="tech-category">
+            <h3>核心功能</h3>
+            <div class="tech-tags">
+              <span class="tech-tag">语音识别</span>
+              <span class="tech-tag">智能对话</span>
+              <span class="tech-tag">数据统计</span>
+              <span class="tech-tag">权限管理</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- AI 技术探索 -->
+    <section id="ai" class="section ai-section">
+      <div class="section-content">
+        <h2 class="section-title">
+          <span class="ai-icon">🤖</span>
+          AI 功能探索
+          <span class="section-subtitle">技术实践与学习成果</span>
+        </h2>
+        <div class="ai-features">
+          <div class="ai-feature">
+            <div class="feature-icon">🎤</div>
+            <h3>语音录入</h3>
+            <p>探索语音识别技术在业务表单中的应用</p>
+            <p class="feature-desc">通过语音快速创建销售/采购单</p>
+          </div>
+          <div class="ai-feature">
+            <div class="feature-icon">💬</div>
+            <h3>智能对话</h3>
+            <p>学习LLM在业务系统中的集成方式</p>
+            <p class="feature-desc">自然语言查询库存、生成报表</p>
+          </div>
+          <div class="ai-feature">
+            <div class="feature-icon">📊</div>
+            <h3>数据可视化</h3>
+            <p>ECharts图表展示销售、库存趋势</p>
+            <p class="feature-desc">多维度数据分析与统计</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 核心功能 -->
+    <section id="features" class="section features-section">
+      <div class="section-content">
+        <h2 class="section-title">已实现功能模块</h2>
+        <p class="section-desc">项目中完整实现的功能模块展示</p>
+        <div class="features-grid">
+          <div class="feature-card">
+            <div class="card-icon">📦</div>
+            <h3>销售管理</h3>
+            <p>销售订单、出库单、退货单全流程管理</p>
+          </div>
+          <div class="feature-card">
+            <div class="card-icon">🛒</div>
+            <h3>采购管理</h3>
+            <p>采购订单、入库单、退货单高效处理</p>
+          </div>
+          <div class="feature-card">
+            <div class="card-icon">📊</div>
+            <h3>库存管理</h3>
+            <p>实时库存查询、调拨、盘点、预警</p>
+          </div>
+          <div class="feature-card">
+            <div class="card-icon">💰</div>
+            <h3>财务管理</h3>
+            <p>应收应付账款、费用管理、结算</p>
+          </div>
+          <div class="feature-card">
+            <div class="card-icon">👥</div>
+            <h3>客户/供应商</h3>
+            <p>完善的客户与供应商档案管理</p>
+          </div>
+          <div class="feature-card">
+            <div class="card-icon">📈</div>
+            <h3>报表中心</h3>
+            <p>销售、库存、财务多维度报表</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 应用截图 -->
+    <section class="section screenshots-section">
+      <div class="section-content">
+        <h2 class="section-title">界面预览</h2>
+        <p class="section-desc">PC端与移动端界面效果展示</p>
+        <div class="screenshots">
+          <div class="screenshot-item">
+            <img src="/static/images/app-preview-1.jpg" alt="登录页面" />
+          </div>
+          <div class="screenshot-item">
+            <img src="/static/images/app-preview-2.jpg" alt="功能菜单" />
+          </div>
+          <div class="screenshot-item">
+            <img src="/static/images/app-preview-3.jpg" alt="业务功能" />
+          </div>
+          <div class="screenshot-item">
+            <img src="/static/images/app-preview-4.jpg" alt="更多功能" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 在线体验 -->
+    <section id="demo" class="section demo-section">
+      <div class="section-content">
+        <h2 class="section-title">在线体验</h2>
+        <p class="section-desc">欢迎体验本项目的实际运行效果</p>
+        <div class="demo-content">
+          <div class="demo-card admin-entry">
+            <div class="demo-icon">💻</div>
+            <h3>PC 端管理系统</h3>
+            <p>完整的后台管理功能，数据统计与报表展示</p>
+            <router-link to="/index" class="demo-btn">
+              <span>进入系统 →</span>
+            </router-link>
+          </div>
+          <div class="demo-card mobile-entry">
+            <div class="demo-icon">📱</div>
+            <h3>移动端 App</h3>
+            <p>扫码下载移动端，支持语音录入与移动操作</p>
+            <a :href="pgyerUrl" target="_blank" class="demo-btn">
+              <span>扫码下载 →</span>
+            </a>
+            <div class="qr-code-small">
+              <img :src="qrCodeUrl" alt="扫码下载" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 页脚 -->
+    <footer class="footer">
+      <div class="footer-content">
+        <div class="footer-project-info">
+          <p>本站为个人技术作品展示页面，非商业网站</p>
+          <p>项目仅供学习交流使用，不得用于商业目的</p>
+        </div>
+        <div class="footer-links">
+          <a href="mailto:289710565@qq.com">联系作者</a>
+        </div>
+        <p class="copyright">© 2025 羽辽WMS - 个人学习项目 | 学习交流使用</p>
+      </div>
+    </footer>
+  </div>
+</template>
+
+<script>
+export default {
+  name: 'LandingPage',
+  data() {
+    return {
+      apkUrl: process.env.VUE_APP_BASE_API + '/app/download',
+      // 蒲公英下载链接，上传APK到蒲公英后替换此链接
+      // 格式：https://www.pgyer.com/xxxxx
+      pgyerUrl: 'https://www.pgyer.com/zhicunwms',  // 蒲公英下载链接
+      mobileMenuOpen: false  // 移动端菜单展开状态
+    }
+  },
+  computed: {
+    qrCodeUrl() {
+      // 如果有蒲公英链接，用蒲公英链接；否则用本地下载页
+      const url = this.pgyerUrl !== 'https://www.pgyer.com/'
+        ? this.pgyerUrl
+        : window.location.origin + '/download'
+      return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`
+    }
+  },
+  methods: {
+    toggleMobileMenu() {
+      this.mobileMenuOpen = !this.mobileMenuOpen
+    },
+    closeMobileMenu() {
+      this.mobileMenuOpen = false
+    }
+  }
+}
+</script>
+
+<style lang="scss" scoped>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.landing-page {
+  min-height: 100vh;
+  background: #f8f9fa;
+}
+
+/* 导航栏 */
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid #e5e7eb;
+  z-index: 1000;
+}
+
+.header-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 20px;
+  font-weight: bold;
+  color: #1890ff;
+  text-decoration: none;
+}
+
+.logo-icon {
+  font-size: 28px;
+}
+
+.project-tag {
+  font-size: 12px;
+  background: #e6f7ff;
+  color: #1890ff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-left: 8px;
+  font-weight: normal;
+}
+
+.nav {
+  display: flex;
+  gap: 32px;
+  align-items: center;
+}
+
+.nav-link {
+  color: #4b5563;
+  text-decoration: none;
+  font-size: 14px;
+  transition: color 0.3s;
+}
+
+.nav-link:hover {
+  color: #1890ff;
+}
+
+.admin-link {
+  padding: 8px 20px;
+  background: #1890ff;
+  color: white !important;
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+.admin-link:hover {
+  background: #40a9ff;
+}
+
+/* 汉堡菜单按钮 */
+.hamburger-btn {
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  cursor: pointer;
+  padding: 6px;
+  z-index: 1001;
+
+  span {
+    width: 24px;
+    height: 2px;
+    background: #4b5563;
+    transition: all 0.3s ease;
+    border-radius: 2px;
+  }
+
+  &.active span:nth-child(1) {
+    transform: rotate(45deg) translate(5px, 5px);
+  }
+
+  &.active span:nth-child(2) {
+    opacity: 0;
+  }
+
+  &.active span:nth-child(3) {
+    transform: rotate(-45deg) translate(5px, -5px);
+  }
+}
+
+/* 移动端遮罩层 */
+.mobile-overlay {
+  display: none;
+  position: fixed;
+  top: 56px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+}
+
+/* Hero 区域 */
+.hero {
+  padding: 140px 24px 80px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  text-align: center;
+}
+
+.hero-content {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 24px;
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+.ai-icon {
+  font-size: 20px;
+}
+
+.hero-title {
+  font-size: 56px;
+  font-weight: 800;
+  margin-bottom: 20px;
+  line-height: 1.2;
+}
+
+.gradient-text {
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-subtitle {
+  font-size: 18px;
+  opacity: 0.9;
+  margin-bottom: 40px;
+  line-height: 1.6;
+}
+
+.hero-buttons {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-bottom: 60px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 32px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.3s;
+}
+
+.btn-primary {
+  background: white;
+  color: #667eea;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* AI 对话演示 / 项目简介 */
+.ai-demo {
+  max-width: 500px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.project-intro {
+  max-width: 600px;
+}
+
+.intro-content {
+  padding: 24px;
+}
+
+.intro-content p {
+  color: #4b5563;
+  line-height: 1.8;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.tech-highlights {
+  background: #f0f9ff;
+  border-left: 4px solid #1890ff;
+  padding: 12px 16px;
+  border-radius: 4px;
+  color: #1890ff;
+  font-weight: 500;
+}
+
+.demo-header {
+  padding: 16px 20px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e5e7eb;
+  font-weight: 600;
+  color: #374151;
+}
+
+.demo-messages {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.message {
+  max-width: 85%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.message.user {
+  align-self: flex-end;
+  background: #667eea;
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.message.ai {
+  align-self: flex-start;
+  background: #f3f4f6;
+  color: #374151;
+  border-bottom-left-radius: 4px;
+}
+
+.message-content strong {
+  color: #1890ff;
+  font-weight: 600;
+}
+
+/* Section 样式 */
+.section {
+  padding: 80px 24px;
+}
+
+.section-content {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.section-title {
+  font-size: 36px;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 20px;
+  color: #1f2937;
+}
+
+.section-subtitle {
+  display: block;
+  font-size: 16px;
+  font-weight: 400;
+  color: #6b7280;
+  margin-top: 8px;
+}
+
+.section-desc {
+  text-align: center;
+  color: #6b7280;
+  font-size: 14px;
+  margin-top: -10px;
+  margin-bottom: 40px;
+}
+
+.section-icon {
+  font-size: 24px;
+}
+
+/* 关于项目区域 */
+.about-section {
+  background: white;
+}
+
+.about-content {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 40px;
+  margin-top: 50px;
+}
+
+.about-text p {
+  color: #4b5563;
+  line-height: 1.8;
+  margin-bottom: 16px;
+  font-size: 15px;
+}
+
+.project-info {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.info-label {
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.info-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+/* 技术栈区域 */
+.tech-section {
+  background: #f8f9fa;
+}
+
+.tech-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 30px;
+  margin-top: 50px;
+}
+
+.tech-category h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.tech-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.tech-tag {
+  padding: 8px 16px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 20px;
+  font-size: 13px;
+  color: #4b5563;
+  transition: all 0.3s;
+}
+
+.tech-tag:hover {
+  background: #1890ff;
+  color: white;
+  border-color: #1890ff;
+  transform: translateY(-2px);
+}
+
+/* AI 特色区域 */
+.ai-section {
+  background: white;
+}
+
+.ai-features {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 40px;
+  margin-top: 60px;
+}
+
+.ai-feature {
+  text-align: center;
+  padding: 32px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+  border-radius: 16px;
+  transition: transform 0.3s;
+}
+
+.ai-feature:hover {
+  transform: translateY(-8px);
+}
+
+.feature-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.ai-feature h3 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #1f2937;
+}
+
+.ai-feature p {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.feature-desc {
+  color: #1890ff !important;
+  font-style: italic;
+  margin-top: 8px;
+}
+
+/* 功能卡片 */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-top: 50px;
+}
+
+.feature-card {
+  padding: 32px;
+  background: white;
+  border-radius: 16px;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s;
+}
+
+.feature-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+}
+
+.card-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.feature-card h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #1f2937;
+}
+
+.feature-card p {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+/* 截图区域 */
+.screenshots-section {
+  background: white;
+}
+
+.screenshots {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  margin-top: 50px;
+}
+
+.screenshot-item {
+  width: 280px;
+  height: 560px;
+  background: #f3f4f6;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+
+.screenshot-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 在线体验区域 */
+.demo-section {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.demo-section .section-title,
+.demo-section .section-desc {
+  color: white;
+}
+
+.demo-section .section-desc {
+  opacity: 0.9;
+}
+
+.demo-content {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 30px;
+  margin-top: 50px;
+}
+
+.demo-card {
+  padding: 40px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  position: relative;
+}
+
+.demo-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.demo-card h3 {
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.demo-card p {
+  opacity: 0.9;
+  margin-bottom: 24px;
+  font-size: 14px;
+}
+
+.demo-btn {
+  display: inline-block;
+  padding: 12px 32px;
+  background: white;
+  color: #667eea;
+  border-radius: 12px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: transform 0.3s;
+}
+
+.demo-btn:hover {
+  transform: scale(1.05);
+}
+
+.mobile-entry {
+  position: relative;
+}
+
+.qr-code-small {
+  margin-top: 20px;
+}
+
+.qr-code-small img {
+  width: 100px;
+  height: 100px;
+  border-radius: 8px;
+  background: white;
+  padding: 8px;
+}
+
+.admin-entry {
+  padding: 40px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  text-align: center;
+}
+
+.admin-entry h3 {
+  font-size: 20px;
+  margin-bottom: 8px;
+}
+
+.admin-entry p {
+  opacity: 0.8;
+  margin-bottom: 20px;
+}
+
+.admin-link-btn {
+  display: inline-block;
+  padding: 12px 32px;
+  background: white;
+  color: #667eea;
+  border-radius: 12px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: transform 0.3s;
+}
+
+.admin-link-btn:hover {
+  transform: scale(1.05);
+}
+
+/* 页脚 */
+.footer {
+  padding: 32px 24px;
+  background: #1f2937;
+  color: #9ca3af;
+}
+
+.footer-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.footer-project-info {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+.footer-project-info p {
+  margin: 4px 0;
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.footer-links {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.footer-links a {
+  color: #9ca3af;
+  text-decoration: none;
+}
+
+.footer-links a:hover {
+  color: white;
+}
+
+.divider {
+  color: #4b5563;
+}
+
+.copyright {
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+/* 平板适配 (768px - 1024px) */
+@media (max-width: 1024px) {
+  .hero-title {
+    font-size: 42px;
+  }
+
+  .ai-features,
+  .features-grid,
+  .tech-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+  }
+
+  .about-content {
+    grid-template-columns: 1fr;
+    gap: 30px;
+  }
+
+  .screenshots {
+    flex-wrap: wrap;
+  }
+
+  .screenshot-item {
+    width: 240px;
+    height: 480px;
+  }
+
+  .demo-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 手机适配 (<= 768px) */
+@media (max-width: 768px) {
+  /* 导航栏 */
+  .header-content {
+    padding: 0 16px;
+    height: 56px;
+  }
+
+  .logo-text {
+    font-size: 18px;
+  }
+
+  .project-tag {
+    display: none;
+  }
+
+  /* 显示汉堡菜单按钮 */
+  .hamburger-btn {
+    display: flex;
+  }
+
+  /* 移动端遮罩层 */
+  .mobile-overlay {
+    display: block;
+  }
+
+  /* 导航菜单移动端样式 */
+  .nav {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    right: 0;
+    background: white;
+    flex-direction: column;
+    padding: 8px 0;
+    gap: 0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-100%);
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s ease;
+    z-index: 1000;
+
+    &.mobile-open {
+      transform: translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .nav-link {
+      padding: 14px 20px;
+      border-bottom: 1px solid #f3f4f6;
+      font-size: 15px;
+      color: #374151;
+
+      &:last-child {
+        border-bottom: none;
+      }
+
+      &:hover {
+        background: #f8f9fa;
+        color: #1890ff;
+      }
+    }
+
+    .admin-link {
+      margin: 8px 16px;
+      padding: 12px 20px;
+      text-align: center;
+      border-bottom: none;
+
+      &:hover {
+        background: #1890ff;
+        color: white !important;
+      }
+    }
+  }
+
+  /* Hero 区域 */
+  .hero {
+    padding: 100px 16px 60px;
+  }
+
+  .hero-badge {
+    padding: 6px 14px;
+    font-size: 12px;
+    margin-bottom: 16px;
+  }
+
+  .hero-title {
+    font-size: 32px;
+    margin-bottom: 16px;
+  }
+
+  .hero-subtitle {
+    font-size: 15px;
+    margin-bottom: 32px;
+  }
+
+  .hero-buttons {
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 40px;
+  }
+
+  .btn {
+    padding: 12px 24px;
+    font-size: 15px;
+  }
+
+  /* AI 演示框 */
+  .ai-demo {
+    max-width: 100%;
+    margin: 0 auto;
+  }
+
+  .demo-messages {
+    padding: 16px;
+  }
+
+  .message {
+    max-width: 90%;
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+
+  /* Section */
+  .section {
+    padding: 50px 16px;
+  }
+
+  .section-title {
+    font-size: 26px;
+  }
+
+  .section-subtitle {
+    font-size: 14px;
+  }
+
+  /* 关于项目 */
+  .about-content {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  /* 技术栈 */
+  .tech-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .tech-tags {
+    justify-content: flex-start;
+  }
+
+  /* 在线体验 */
+  .demo-content {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .demo-card {
+    padding: 30px 20px;
+  }
+
+  /* AI 特色功能 */
+  .ai-features {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin-top: 32px;
+  }
+
+  .ai-feature {
+    padding: 20px;
+  }
+
+  .feature-icon {
+    font-size: 36px;
+  }
+
+  .ai-feature h3 {
+    font-size: 17px;
+  }
+
+  .ai-feature p {
+    font-size: 13px;
+  }
+
+  /* 功能卡片 */
+  .features-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin-top: 32px;
+  }
+
+  .feature-card {
+    padding: 20px;
+  }
+
+  .card-icon {
+    font-size: 36px;
+  }
+
+  .feature-card h3 {
+    font-size: 16px;
+  }
+
+  .feature-card p {
+    font-size: 13px;
+  }
+
+  /* 截图区域 */
+  .screenshots {
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .screenshot-item {
+    width: 200px;
+    height: 400px;
+  }
+
+  /* 下载区域 */
+  .download-content {
+    gap: 24px;
+  }
+
+  .download-main {
+    grid-template-columns: 1fr;
+    padding: 24px;
+  }
+
+  .download-info h3 {
+    font-size: 20px;
+  }
+
+  .download-btn {
+    padding: 10px 18px;
+  }
+
+  .download-icon {
+    font-size: 24px;
+  }
+
+  .qr-placeholder {
+    width: 140px;
+    height: 140px;
+  }
+
+  .admin-entry {
+    padding: 24px;
+  }
+
+  .admin-entry h3 {
+    font-size: 18px;
+  }
+
+  .admin-link-btn {
+    padding: 10px 24px;
+    font-size: 15px;
+  }
+
+  /* 页脚 */
+  .footer {
+    padding: 24px 16px;
+  }
+
+  .footer-links {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .divider {
+    display: none;
+  }
+
+  .copyright {
+    font-size: 12px;
+  }
+}
+
+/* 小屏手机 (<= 480px) */
+@media (max-width: 480px) {
+  .hero-title {
+    font-size: 26px;
+  }
+
+  .hero-subtitle {
+    font-size: 14px;
+  }
+
+  .section-title {
+    font-size: 22px;
+  }
+
+  .screenshot-item {
+    width: 180px;
+    height: 360px;
+  }
+
+  .qr-placeholder {
+    width: 120px;
+    height: 120px;
+  }
+
+  .qr-tip {
+    font-size: 12px;
+  }
+}
+</style>

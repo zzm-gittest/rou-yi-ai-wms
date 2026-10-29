@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.wms.mapper.WmsAccountsReceivableMapper">
+
+    <resultMap type="com.ruoyi.wms.domain.WmsAccountsReceivable" id="WmsAccountsReceivableResult">
+        <id     property="id"            column="id"            />
+        <result property="customerId"    column="customer_id"   />
+        <result property="supplierId"    column="supplier_id"   />
+        <result property="billType"      column="bill_type"     />
+        <result property="billNo"        column="bill_no"       />
+        <result property="billId"        column="bill_id"       />
+        <result property="billAmount"    column="bill_amount"   />
+        <result property="receivedAmount" column="received_amount" />
+        <result property="arAmount"      column="ar_amount"     />
+        <result property="arStatus"      column="ar_status"     />
+        <result property="billDate"      column="bill_date"     />
+        <result property="dueDate"       column="due_date"      />
+        <result property="createTime"    column="create_time"   />
+    </resultMap>
+
+    <resultMap type="com.ruoyi.wms.domain.vo.accountsReceivable.WmsAccountsReceivableRespVO" id="WmsAccountsReceivableRespVOResult">
+        <id     property="id"            column="id"            />
+        <result property="customerId"    column="customer_id"   />
+        <result property="customerName"  column="customer_name" />
+        <result property="supplierId"    column="supplier_id"   />
+        <result property="supplierName"  column="supplier_name" />
+        <result property="billType"      column="bill_type"     />
+        <result property="billNo"        column="bill_no"       />
+        <result property="billId"        column="bill_id"       />
+        <result property="billAmount"    column="bill_amount"   />
+        <result property="receivedAmount" column="received_amount" />
+        <result property="arAmount"      column="ar_amount"     />
+        <result property="arStatus"      column="ar_status"     />
+        <result property="billDate"      column="bill_date"     />
+        <result property="dueDate"       column="due_date"      />
+    </resultMap>
+
+    <select id="selectArPage" resultMap="WmsAccountsReceivableRespVOResult">
+        SELECT
+            ar.id,
+            ar.customer_id,
+            c.customer_name,
+            ar.supplier_id,
+            s.supplier_name,
+            ar.bill_type,
+            CASE ar.bill_type
+                WHEN '1' THEN '销售订单'
+                WHEN '2' THEN '销售出库'
+                WHEN '3' THEN '采购退货'
+                ELSE '未知'
+            END AS bill_type_name,
+            ar.bill_no,
+            ar.bill_id,
+            ar.bill_amount,
+            IFNULL(ar.received_amount, 0) AS received_amount,
+            ar.ar_amount,
+            ar.ar_status,
+            CASE ar.ar_status
+                WHEN '0' THEN '未结清'
+                WHEN '1' THEN '已结清'
+                ELSE '未知'
+            END AS ar_status_name,
+            ar.bill_date,
+            ar.due_date
+        FROM wms_accounts_receivable ar
+        LEFT JOIN wms_customer c ON ar.customer_id = c.id
+        LEFT JOIN wms_supplier s ON ar.supplier_id = s.id
+        WHERE 1=1
+        <if test="reqVO.customerId != null">
+            AND ar.customer_id = #{reqVO.customerId}
+        </if>
+        <if test="reqVO.customerName != null and reqVO.customerName != ''">
+            AND c.customer_name LIKE CONCAT('%', #{reqVO.customerName}, '%')
+        </if>
+        <if test="reqVO.billNo != null and reqVO.billNo != ''">
+            AND ar.bill_no LIKE CONCAT('%', #{reqVO.billNo}, '%')
+        </if>
+        <if test="reqVO.billType != null and reqVO.billType != ''">
+            AND ar.bill_type = #{reqVO.billType}
+        </if>
+        <if test="reqVO.arStatus != null and reqVO.arStatus != ''">
+            AND ar.ar_status = #{reqVO.arStatus}
+        </if>
+        <choose>
+            <when test="reqVO.paymentStatus != null and reqVO.paymentStatus == 0">
+                AND IFNULL(ar.received_amount, 0) = 0
+            </when>
+            <when test="reqVO.paymentStatus != null and reqVO.paymentStatus == 1">
+                AND IFNULL(ar.received_amount, 0) > 0 AND IFNULL(ar.received_amount, 0) &lt; ar.ar_amount
+            </when>
+            <when test="reqVO.paymentStatus != null and reqVO.paymentStatus == 2">
+                AND IFNULL(ar.received_amount, 0) &gt;= ar.ar_amount
+            </when>
+        </choose>
+        <if test="reqVO.billDateStart != null">
+            AND ar.bill_date &gt;= #{reqVO.billDateStart}
+        </if>
+        <if test="reqVO.billDateEnd != null">
+            AND ar.bill_date &lt;= #{reqVO.billDateEnd}
+        </if>
+        <if test="reqVO.dueDateStart != null">
+            AND ar.due_date &gt;= #{reqVO.dueDateStart}
+        </if>
+        <if test="reqVO.dueDateEnd != null">
+            AND ar.due_date &lt;= #{reqVO.dueDateEnd}
+        </if>
+        ORDER BY ar.bill_date DESC, ar.id DESC
+    </select>
+
+    <select id="selectArById" resultMap="WmsAccountsReceivableRespVOResult">
+        SELECT
+            ar.id,
+            ar.customer_id,
+            c.customer_name,
+            ar.supplier_id,
+            s.supplier_name,
+            ar.bill_type,
+            CASE ar.bill_type
+                WHEN '1' THEN '销售订单'
+                WHEN '2' THEN '销售出库'
+                WHEN '3' THEN '采购退货'
+                ELSE '未知'
+            END AS bill_type_name,
+            ar.bill_no,
+            ar.bill_id,
+            ar.bill_amount,
+            IFNULL(ar.received_amount, 0) AS received_amount,
+            ar.ar_amount,
+            ar.ar_status,
+            CASE ar.ar_status
+                WHEN '0' THEN '未结清'
+                WHEN '1' THEN '已结清'
+                ELSE '未知'
+            END AS ar_status_name,
+            ar.bill_date,
+            ar.due_date
+        FROM wms_accounts_receivable ar
+        LEFT JOIN wms_customer c ON ar.customer_id = c.id
+        LEFT JOIN wms_supplier s ON ar.supplier_id = s.id
+        WHERE ar.id = #{id}
+    </select>
+
+</mapper>

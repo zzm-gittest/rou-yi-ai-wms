@@ -1,0 +1,40 @@
+/**
+ * 金蝶风格主题色
+ * 商务化、专业化
+**/
+
+/* theme color */
+$--color-primary: #1890ff;        // 商务蓝 - 金蝶风格
+$--color-success: #52c41a;        // 成功绿
+$--color-warning: #faad14;        // 警告橙
+$--color-danger: #ff4d4f;         // 危险红
+
+$--button-font-weight: 500;
+
+/* 边框颜色 */
+$--border-color-light: #e5e7eb;
+$--border-color-lighter: #f3f4f6;
+
+$--table-border: 1px solid #e5e7eb;
+
+/* 文字颜色 */
+$--color-text-primary: #1f2937;
+$--color-text-regular: #4b5563;
+$--color-text-secondary: #6b7280;
+$--color-text-placeholder: #9ca3af;
+
+/* 背景颜色 */
+$--background-color-base: #ffffff;
+$--background-color-base: #f5f7fa;
+
+/* icon font path, required */
+$--font-path: '~element-ui/lib/theme-chalk/fonts';
+
+@import "~element-ui/packages/theme-chalk/src/index";
+
+// the :export directive is the magic sauce for webpack
+// https://www.bluematador.com/blog/how-to-share-variables-between-js-and-sass
+:export {
+  theme: $--color-primary;
+}
+

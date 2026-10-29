@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.wms.mapper.WmsStockTransferMapper">
+
+    <resultMap type="com.ruoyi.wms.domain.WmsStockTransfer" id="WmsStockTransferResult">
+        <id     property="id"            column="id"            />
+        <result property="tenantId"      column="tenant_id"     />
+        <result property="transferNo"    column="transfer_no"   />
+        <result property="outWarehouseId" column="out_warehouse_id" />
+        <result property="inWarehouseId" column="in_warehouse_id" />
+        <result property="transferDate"  column="transfer_date" />
+        <result property="transferStatus" column="transfer_status" />
+        <result property="handler"       column="handler"       />
+        <result property="approveBy"     column="approve_by"    />
+        <result property="approveTime"   column="approve_time"  />
+        <result property="delFlag"       column="del_flag"      />
+        <result property="createBy"      column="create_by"     />
+        <result property="createTime"    column="create_time"   />
+        <result property="updateBy"      column="update_by"     />
+        <result property="updateTime"    column="update_time"   />
+        <result property="remark"        column="remark"        />
+    </resultMap>
+
+</mapper>

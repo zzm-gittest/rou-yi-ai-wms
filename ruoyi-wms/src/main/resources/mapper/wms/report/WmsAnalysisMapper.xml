@@ -1,0 +1,336 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.wms.mapper.report.WmsAnalysisMapper">
+
+    <!-- 按时间段汇总销售出库金额 -->
+    <select id="sumSalesAmount" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(so.total_amount), 0)
+        FROM wms_sales_out so
+        WHERE so.del_flag = '0'
+          AND so.tenant_id = #{tenantId}
+          AND so.approve_by IS NOT NULL
+          AND so.approve_by != ''
+          AND DATE(so.create_time) &gt;= #{startDate}
+          AND DATE(so.create_time) &lt;= #{endDate}
+          <if test="warehouseId != null">
+              AND so.warehouse_id = #{warehouseId}
+          </if>
+    </select>
+
+    <!-- 按时间段汇总销售退货金额 -->
+    <select id="sumSalesReturnAmount" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(sr.total_amount), 0)
+        FROM wms_sales_return sr
+        WHERE sr.del_flag = '0'
+          AND sr.tenant_id = #{tenantId}
+          AND sr.approve_by IS NOT NULL
+          AND sr.approve_by != ''
+          AND DATE(sr.create_time) &gt;= #{startDate}
+          AND DATE(sr.create_time) &lt;= #{endDate}
+          <if test="warehouseId != null">
+              AND sr.warehouse_id = #{warehouseId}
+          </if>
+    </select>
+
+    <!-- 按时间段统计销售出库单数 -->
+    <select id="countSalesOutOrders" resultType="int">
+        SELECT COUNT(*)
+        FROM wms_sales_out so
+        WHERE so.del_flag = '0'
+          AND so.tenant_id = #{tenantId}
+          AND so.approve_by IS NOT NULL
+          AND so.approve_by != ''
+          AND DATE(so.create_time) &gt;= #{startDate}
+          AND DATE(so.create_time) &lt;= #{endDate}
+          <if test="warehouseId != null">
+              AND so.warehouse_id = #{warehouseId}
+          </if>
+    </select>
+
+    <!-- 按时间段汇总销售出库成本 -->
+    <select id="sumSalesCost" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(COALESCE(l.quantity, 0) * COALESCE(l.cost_price, 0)), 0)
+        FROM wms_stock_log l
+        INNER JOIN wms_sales_out so ON so.id = l.bill_id
+        WHERE l.bill_type = '2'
+          AND l.change_type = '2'
+          AND so.del_flag = '0'
+          AND so.tenant_id = #{tenantId}
+          AND so.approve_by IS NOT NULL
+          AND so.approve_by != ''
+          AND DATE(so.create_time) &gt;= #{startDate}
+          AND DATE(so.create_time) &lt;= #{endDate}
+          <if test="warehouseId != null">
+              AND so.warehouse_id = #{warehouseId}
+          </if>
+    </select>
+
+    <!-- 按时间段汇总采购入库金额 -->
+    <select id="sumPurchaseAmount" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(pi.total_amount), 0)
+        FROM wms_purchase_in pi
+        WHERE pi.del_flag = '0'
+          AND pi.tenant_id = #{tenantId}
+          AND pi.approve_by IS NOT NULL
+          AND pi.approve_by != ''
+          AND DATE(pi.create_time) &gt;= #{startDate}
+          AND DATE(pi.create_time) &lt;= #{endDate}
+          <if test="warehouseId != null">
+              AND pi.warehouse_id = #{warehouseId}
+          </if>
+    </select>
+
+    <!-- 按时间段汇总采购退货金额 -->
+    <select id="sumPurchaseReturnAmount" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(pr.total_amount), 0)
+        FROM wms_purchase_return pr
+        WHERE pr.del_flag = '0'
+          AND pr.tenant_id = #{tenantId}
+          AND pr.approve_by IS NOT NULL
+          AND pr.approve_by != ''
+          AND DATE(pr.create_time) &gt;= #{startDate}
+          AND DATE(pr.create_time) &lt;= #{endDate}
+          <if test="warehouseId != null">
+              AND pr.warehouse_id = #{warehouseId}
+          </if>
+    </select>
+
+    <!-- 按时间段统计采购入库单数 -->
+    <select id="countPurchaseInOrders" resultType="int">
+        SELECT COUNT(*)
+        FROM wms_purchase_in pi
+        WHERE pi.del_flag = '0'
+          AND pi.tenant_id = #{tenantId}
+          AND pi.approve_by IS NOT NULL
+          AND pi.approve_by != ''
+          AND DATE(pi.create_time) &gt;= #{startDate}
+          AND DATE(pi.create_time) &lt;= #{endDate}
+          <if test="warehouseId != null">
+              AND pi.warehouse_id = #{warehouseId}
+          </if>
+    </select>
+
+    <!-- 热销商品 TOP N -->
+    <select id="selectTopSellingGoods" resultType="java.util.Map">
+        SELECT
+            g.goods_name AS goodsName,
+            sk.spec_info AS spec,
+            sk.unit_name AS unitName,
+            SUM(soi.quantity) AS salesQuantity,
+            SUM(soi.amount) AS salesAmount
+        FROM wms_sales_out_item soi
+        INNER JOIN wms_sales_out so ON so.id = soi.out_id
+        LEFT JOIN wms_goods_sku sk ON sk.id = soi.sku_id
+        LEFT JOIN wms_goods g ON g.id = sk.goods_id
+        WHERE so.del_flag = '0'
+          AND so.tenant_id = #{tenantId}
+          AND so.approve_by IS NOT NULL
+          AND so.approve_by != ''
+          AND DATE(so.create_time) &gt;= #{startDate}
+          AND DATE(so.create_time) &lt;= #{endDate}
+        GROUP BY soi.sku_id, g.goods_name, sk.spec_info, sk.unit_name
+        ORDER BY salesAmount DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 客户销售排名 TOP N -->
+    <select id="selectCustomerSalesRanking" resultType="java.util.Map">
+        SELECT
+            c.customer_name AS customerName,
+            COUNT(so.id) AS orderCount,
+            SUM(so.total_amount) AS salesAmount
+        FROM wms_sales_out so
+        LEFT JOIN wms_customer c ON c.id = so.customer_id
+        WHERE so.del_flag = '0'
+          AND so.tenant_id = #{tenantId}
+          AND so.approve_by IS NOT NULL
+          AND so.approve_by != ''
+          AND DATE(so.create_time) &gt;= #{startDate}
+          AND DATE(so.create_time) &lt;= #{endDate}
+        GROUP BY so.customer_id, c.customer_name
+        ORDER BY salesAmount DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 商品日均销量（近 N 天） -->
+    <select id="selectDailyAvgSales" resultType="java.util.Map">
+        SELECT
+            soi.sku_id AS skuId,
+            g.goods_name AS goodsName,
+            sk.spec_info AS spec,
+            sk.unit_name AS unitName,
+            SUM(soi.quantity) / #{days} AS dailyAvgQty,
+            s.quantity AS currentStock
+        FROM wms_sales_out_item soi
+        INNER JOIN wms_sales_out so ON so.id = soi.out_id
+        LEFT JOIN wms_goods_sku sk ON sk.id = soi.sku_id
+        LEFT JOIN wms_goods g ON g.id = sk.goods_id
+        LEFT JOIN wms_stock s ON s.sku_id = soi.sku_id AND s.tenant_id = #{tenantId}
+        WHERE so.del_flag = '0'
+          AND so.tenant_id = #{tenantId}
+          AND so.approve_by IS NOT NULL
+          AND so.approve_by != ''
+          AND DATE(so.create_time) &gt;= DATE_SUB(CURDATE(), INTERVAL #{days} DAY)
+        GROUP BY soi.sku_id, g.goods_name, sk.spec_info, sk.unit_name, s.quantity
+        HAVING dailyAvgQty > 0
+    </select>
+
+    <!-- 应收账款汇总 -->
+    <select id="selectReceivableSummary" resultType="java.util.Map">
+        SELECT
+            COALESCE(SUM(ar.ar_amount), 0) AS receivableTotal,
+            COALESCE(SUM(CASE WHEN ar.ar_amount - ar.received_amount > 0
+                              AND ar.due_date &lt; CURDATE()
+                         THEN ar.ar_amount - ar.received_amount ELSE 0 END), 0) AS overdueAmount,
+            SUM(CASE WHEN ar.ar_amount - ar.received_amount > 0
+                      AND ar.due_date &lt; CURDATE()
+                 THEN 1 ELSE 0 END) AS overdueCount
+        FROM wms_accounts_receivable ar
+        WHERE ar.del_flag = '0'
+          AND ar.tenant_id = #{tenantId}
+    </select>
+
+    <!-- 逾期应收列表 -->
+    <select id="selectOverdueReceivables" resultType="java.util.Map">
+        SELECT
+            c.customer_name AS customerName,
+            ar.ar_amount AS receivableAmount,
+            ar.received_amount AS receivedAmount,
+            (ar.ar_amount - ar.received_amount) AS remainAmount,
+            DATEDIFF(CURDATE(), ar.due_date) AS overdueDays
+        FROM wms_accounts_receivable ar
+        LEFT JOIN wms_customer c ON c.id = ar.customer_id
+        WHERE ar.del_flag = '0'
+          AND ar.tenant_id = #{tenantId}
+          AND ar.ar_amount - ar.received_amount > 0
+          AND ar.due_date &lt; DATE_SUB(CURDATE(), INTERVAL #{overdueDays} DAY)
+        ORDER BY overdueDays DESC
+    </select>
+
+    <!-- 待审核采购订单数 -->
+    <select id="countPendingPurchaseOrders" resultType="int">
+        SELECT COUNT(*)
+        FROM wms_purchase_order po
+        WHERE po.del_flag = '0'
+          AND po.tenant_id = #{tenantId}
+          AND po.order_status = '0'
+    </select>
+
+    <!-- 待审核销售订单数 -->
+    <select id="countPendingSalesOrders" resultType="int">
+        SELECT COUNT(*)
+        FROM wms_sales_order so
+        WHERE so.del_flag = '0'
+          AND so.tenant_id = #{tenantId}
+          AND so.order_status = '0'
+    </select>
+
+    <!-- 已审核超 N 天未入库的采购订单 -->
+    <select id="selectPendingPurchaseIn" resultType="java.util.Map">
+        SELECT
+            po.order_no AS orderNo,
+            s.supplier_name AS supplierName,
+            po.total_amount AS totalAmount,
+            DATEDIFF(CURDATE(), po.approve_time) AS pendingDays
+        FROM wms_purchase_order po
+        LEFT JOIN wms_supplier s ON s.id = po.supplier_id
+        WHERE po.del_flag = '0'
+          AND po.tenant_id = #{tenantId}
+          AND po.order_status IN ('1', '4')
+          AND po.approve_time IS NOT NULL
+          AND DATEDIFF(CURDATE(), po.approve_time) &gt;= #{overdueDays}
+          AND NOT EXISTS (
+              SELECT 1 FROM wms_purchase_in pi
+              WHERE pi.order_id = po.id AND pi.del_flag = '0'
+          )
+        ORDER BY pendingDays DESC
+    </select>
+
+    <!-- 已审核超 N 天未出库的销售订单 -->
+    <select id="selectPendingSalesOut" resultType="java.util.Map">
+        SELECT
+            so.order_no AS orderNo,
+            c.customer_name AS customerName,
+            so.total_amount AS totalAmount,
+            DATEDIFF(CURDATE(), so.approve_time) AS pendingDays
+        FROM wms_sales_order so
+        LEFT JOIN wms_customer c ON c.id = so.customer_id
+        WHERE so.del_flag = '0'
+          AND so.tenant_id = #{tenantId}
+          AND so.order_status IN ('1', '4')
+          AND so.approve_time IS NOT NULL
+          AND DATEDIFF(CURDATE(), so.approve_time) &gt;= #{overdueDays}
+          AND NOT EXISTS (
+              SELECT 1 FROM wms_sales_out sout
+              WHERE sout.order_id = so.id AND sout.del_flag = '0'
+          )
+        ORDER BY pendingDays DESC
+    </select>
+
+    <!-- 滞销商品 -->
+    <select id="selectStaledGoods" resultType="java.util.Map">
+        SELECT
+            g.goods_name AS goodsName,
+            sk.spec_info AS spec,
+            sk.unit_name AS unitName,
+            s.quantity AS currentStock,
+            s.quantity * COALESCE(sk.purchase_price, 0) AS stockAmount
+        FROM wms_stock s
+        LEFT JOIN wms_goods_sku sk ON sk.id = s.sku_id
+        LEFT JOIN wms_goods g ON g.id = sk.goods_id
+        WHERE s.tenant_id = #{tenantId}
+          AND s.quantity > 0
+          AND s.quantity * COALESCE(sk.purchase_price, 0) &gt;= #{minAmount}
+          AND NOT EXISTS (
+              SELECT 1
+              FROM wms_sales_out_item soi
+              INNER JOIN wms_sales_out so ON so.id = soi.out_id
+              WHERE soi.sku_id = s.sku_id
+                AND so.del_flag = '0'
+                AND so.tenant_id = #{tenantId}
+                AND so.approve_by IS NOT NULL
+                AND so.approve_by != ''
+                AND DATE(so.create_time) &gt;= DATE_SUB(CURDATE(), INTERVAL #{days} DAY)
+          )
+        ORDER BY stockAmount DESC
+    </select>
+
+    <!-- 库存预警：库存不足 N 天 -->
+    <select id="selectStockShortage" resultType="java.util.Map">
+        SELECT
+            sub.skuId,
+            sub.goodsName,
+            sub.spec,
+            sub.unitName,
+            sub.currentStock,
+            sub.dailyAvgQty,
+            FLOOR(sub.currentStock / sub.dailyAvgQty) AS estimatedDays
+        FROM (
+            SELECT
+                soi.sku_id AS skuId,
+                g.goods_name AS goodsName,
+                sk.spec_info AS spec,
+                sk.unit_name AS unitName,
+                COALESCE(s.quantity, 0) AS currentStock,
+                SUM(soi.quantity) / #{avgDays} AS dailyAvgQty
+            FROM wms_sales_out_item soi
+            INNER JOIN wms_sales_out so ON so.id = soi.out_id
+            LEFT JOIN wms_goods_sku sk ON sk.id = soi.sku_id
+            LEFT JOIN wms_goods g ON g.id = sk.goods_id
+            LEFT JOIN wms_stock s ON s.sku_id = soi.sku_id AND s.tenant_id = #{tenantId}
+            WHERE so.del_flag = '0'
+              AND so.tenant_id = #{tenantId}
+              AND so.approve_by IS NOT NULL
+              AND so.approve_by != ''
+              AND DATE(so.create_time) &gt;= DATE_SUB(CURDATE(), INTERVAL #{avgDays} DAY)
+            GROUP BY soi.sku_id, g.goods_name, sk.spec_info, sk.unit_name, s.quantity
+            HAVING dailyAvgQty > 0
+        ) sub
+        WHERE sub.currentStock > 0
+          AND sub.currentStock / sub.dailyAvgQty &lt;= #{thresholdDays}
+        ORDER BY estimatedDays ASC
+    </select>
+
+</mapper>

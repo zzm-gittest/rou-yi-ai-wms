@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.wms.mapper.WmsStockLogMapper">
+
+    <resultMap type="com.ruoyi.wms.domain.WmsStockLog" id="WmsStockLogResult">
+        <id     property="id"            column="id"            />
+        <result property="tenantId"      column="tenant_id"     />
+        <result property="warehouseId"   column="warehouse_id"  />
+        <result property="skuId"         column="sku_id"        />
+        <result property="goodsId"       column="goods_id"      />
+        <result property="billType"      column="bill_type"     />
+        <result property="billNo"        column="bill_no"       />
+        <result property="billId"        column="bill_id"       />
+        <result property="changeType"    column="change_type"   />
+        <result property="quantity"      column="quantity"      />
+        <result property="beforeQty"     column="before_qty"    />
+        <result property="afterQty"      column="after_qty"     />
+        <result property="costPrice"     column="cost_price"    />
+        <result property="createTime"    column="create_time"   />
+        <result property="createBy"      column="create_by"     />
+        <result property="remark"        column="remark"        />
+    </resultMap>
+
+    <resultMap type="com.ruoyi.wms.domain.vo.stockLog.WmsStockLogRespVO" id="WmsStockLogRespVOResult">
+        <id     property="id"            column="id"            />
+        <result property="warehouseName" column="warehouse_name"/>
+        <result property="skuCode"       column="sku_code"      />
+        <result property="skuName"       column="sku_name"      />
+        <result property="goodsId"       column="goods_id"      />
+        <result property="goodsName"     column="goods_name"    />
+        <result property="billTypeName"  column="bill_type_name"/>
+        <result property="billType"      column="bill_type"     />
+        <result property="billNo"        column="bill_no"       />
+        <result property="billId"        column="bill_id"       />
+        <result property="changeTypeName" column="change_type_name"/>
+        <result property="changeType"    column="change_type"   />
+        <result property="quantity"      column="quantity"      />
+        <result property="beforeQty"     column="before_qty"    />
+        <result property="afterQty"      column="after_qty"     />
+        <result property="costPrice"     column="cost_price"    />
+        <result property="createTime"    column="create_time"   />
+        <result property="createBy"      column="create_by"     />
+        <result property="remark"        column="remark"        />
+    </resultMap>
+
+    <resultMap type="com.ruoyi.wms.domain.vo.stockLog.WmsStockLogExportVO" id="WmsStockLogExportVOResult">
+        <result property="warehouseName"  column="warehouse_name" />
+        <result property="goodsName"      column="goods_name"     />
+        <result property="skuCode"        column="sku_code"       />
+        <result property="skuName"        column="sku_name"       />
+        <result property="billTypeName"   column="bill_type_name" />
+        <result property="billNo"         column="bill_no"        />
+        <result property="changeTypeName" column="change_type_name"/>
+        <result property="quantity"       column="quantity"       />
+        <result property="beforeQty"      column="before_qty"     />
+        <result property="afterQty"       column="after_qty"      />
+        <result property="createBy"       column="create_by"      />
+        <result property="createTime"     column="create_time"    />
+        <result property="remark"         column="remark"         />
+    </resultMap>
+
+    <select id="selectStockLogPage" resultMap="WmsStockLogRespVOResult">
+        SELECT
+            l.id,
+            l.warehouse_id,
+            w.warehouse_name,
+            l.sku_id,
+            s.sku_code,
+            s.sku_name,
+            l.goods_id,
+            g.goods_name,
+            l.bill_type,
+            CASE l.bill_type
+                WHEN '1' THEN '采购入库'
+                WHEN '2' THEN '销售出库'
+                WHEN '3' THEN '采购退货'
+                WHEN '4' THEN '销售退货'
+                WHEN '5' THEN '盘点'
+                WHEN '6' THEN '调拨'
+                ELSE '未知'
+            END AS bill_type_name,
+            l.bill_no,
+            l.bill_id,
+            l.change_type,
+            CASE l.change_type
+                WHEN '1' THEN '增加'
+                WHEN '2' THEN '减少'
+                ELSE '未知'
+            END AS change_type_name,
+            l.quantity,
+            l.before_qty,
+            l.after_qty,
+            l.cost_price,
+            l.create_time,
+            l.create_by,
+            l.remark
+        FROM wms_stock_log l
+        LEFT JOIN wms_warehouse w ON l.warehouse_id = w.id
+        LEFT JOIN wms_goods_sku s ON l.sku_id = s.id
+        LEFT JOIN wms_goods g ON l.goods_id = g.id
+        <where>
+            <if test="reqVO.warehouseId != null">
+                AND l.warehouse_id = #{reqVO.warehouseId}
+            </if>
+            <if test="reqVO.skuId != null">
+                AND l.sku_id = #{reqVO.skuId}
+            </if>
+            <if test="reqVO.goodsId != null">
+                AND l.goods_id = #{reqVO.goodsId}
+            </if>
+            <if test="reqVO.goodsName != null and reqVO.goodsName != ''">
+                AND g.goods_name LIKE CONCAT('%', #{reqVO.goodsName}, '%')
+            </if>
+            <if test="reqVO.billType != null and reqVO.billType != ''">
+                AND l.bill_type = #{reqVO.billType}
+            </if>
+            <if test="reqVO.billNo != null and reqVO.billNo != ''">
+                AND l.bill_no LIKE CONCAT('%', #{reqVO.billNo}, '%')
+            </if>
+            <if test="reqVO.changeType != null and reqVO.changeType != ''">
+                AND l.change_type = #{reqVO.changeType}
+            </if>
+        </where>
+        ORDER BY l.create_time DESC
+    </select>
+
+    <select id="selectStockLogExportList" resultMap="WmsStockLogExportVOResult">
+        SELECT
+            w.warehouse_name,
+            g.goods_name,
+            s.sku_code,
+            s.sku_name,
+            CASE l.bill_type
+                WHEN '1' THEN '采购入库'
+                WHEN '2' THEN '销售出库'
+                WHEN '3' THEN '采购退货'
+                WHEN '4' THEN '销售退货'
+                WHEN '5' THEN '盘点'
+                WHEN '6' THEN '调拨'
+                ELSE '未知'
+            END AS bill_type_name,
+            l.bill_no,
+            CASE l.change_type
+                WHEN '1' THEN '增加'
+                WHEN '2' THEN '减少'
+                ELSE '未知'
+            END AS change_type_name,
+            l.quantity,
+            l.before_qty,
+            l.after_qty,
+            l.create_by,
+            l.create_time,
+            l.remark
+        FROM wms_stock_log l
+        LEFT JOIN wms_warehouse w ON l.warehouse_id = w.id
+        LEFT JOIN wms_goods_sku s ON l.sku_id = s.id
+        LEFT JOIN wms_goods g ON l.goods_id = g.id
+        <where>
+            <if test="reqVO.warehouseId != null">
+                AND l.warehouse_id = #{reqVO.warehouseId}
+            </if>
+            <if test="reqVO.skuId != null">
+                AND l.sku_id = #{reqVO.skuId}
+            </if>
+            <if test="reqVO.goodsId != null">
+                AND l.goods_id = #{reqVO.goodsId}
+            </if>
+            <if test="reqVO.goodsName != null and reqVO.goodsName != ''">
+                AND g.goods_name LIKE CONCAT('%', #{reqVO.goodsName}, '%')
+            </if>
+            <if test="reqVO.billType != null and reqVO.billType != ''">
+                AND l.bill_type = #{reqVO.billType}
+            </if>
+            <if test="reqVO.billNo != null and reqVO.billNo != ''">
+                AND l.bill_no LIKE CONCAT('%', #{reqVO.billNo}, '%')
+            </if>
+            <if test="reqVO.changeType != null and reqVO.changeType != ''">
+                AND l.change_type = #{reqVO.changeType}
+            </if>
+        </where>
+        ORDER BY l.create_time DESC
+    </select>
+
+</mapper>

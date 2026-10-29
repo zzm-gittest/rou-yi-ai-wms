@@ -1,0 +1,733 @@
+// 金蝶风格全局样式覆盖
+// 商业化、专业化的配色和设计
+
+// 主题色变量
+$kingdee-primary: #1890ff;
+$kingdee-success: #52c41a;
+$kingdee-warning: #faad14;
+$kingdee-danger: #ff4d4f;
+$kingdee-info: #1890ff;
+
+$kingdee-bg-primary: #ffffff;
+$kingdee-bg-secondary: #f5f7fa;
+$kingdee-border: #e5e7eb;
+$kingdee-text-primary: #1f2937;
+$kingdee-text-secondary: #6b7280;
+$kingdee-text-tertiary: #9ca3af;
+
+// 覆盖 Element UI 变量
+$--color-primary: $kingdee-primary;
+$--color-success: $kingdee-success;
+$--color-warning: $kingdee-warning;
+$--color-danger: $kingdee-danger;
+$--color-info: $kingdee-info;
+
+// 全局样式优化
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+    color: $kingdee-text-primary;
+    background: $kingdee-bg-secondary;
+}
+
+// 布局样式
+#app {
+    .main-container {
+        background: $kingdee-bg-secondary;
+    }
+}
+
+// 容器样式
+.app-container {
+    padding: 16px;
+    background: $kingdee-bg-secondary;
+    min-height: calc(100vh - 84px);
+}
+
+// 侧边栏样式 - 保持深色统一背景
+.sidebar-container {
+    // 不覆盖背景色，使用原来的深色主题
+    // background: #ffffff !important;
+    // box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08) !important;
+
+    .el-menu {
+        border-right: none;
+
+        .el-menu-item,
+        .el-submenu__title {
+            color: #bfcbd9;
+            font-size: 14px;
+
+            &:hover {
+                background: rgba(0, 0, 0, 0.06) !important;
+                color: #fff;
+            }
+
+            &.is-active {
+                background: rgba(24, 144, 255, 0.15) !important;
+                color: $kingdee-primary !important;
+                font-weight: 600;
+                border-right: 3px solid $kingdee-primary;
+            }
+
+            .el-icon {
+                color: inherit;
+            }
+        }
+
+        .el-submenu {
+            .el-menu-item {
+                &.is-active {
+                    background: rgba(24, 144, 255, 0.12) !important;
+                    color: $kingdee-primary !important;
+                    font-weight: 500;
+                }
+            }
+        }
+    }
+
+    .logo-container {
+        // 不覆盖 logo 容器样式，使用原来的
+    }
+}
+
+// 顶部导航栏
+.navbar {
+    background: #fff !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+
+    .right-menu {
+        .el-icon {
+            color: $kingdee-text-secondary;
+        }
+    }
+}
+
+// 标签页样式
+.tags-view-container {
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+
+    .tags-view-wrapper {
+        .el-tabs__header {
+            margin: 0;
+        }
+    }
+}
+
+// 卡片样式优化
+.el-card {
+    border: 1px solid $kingdee-border;
+    border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+
+    .el-card__header {
+        padding: 16px 20px;
+        border-bottom: 1px solid $kingdee-border;
+        background: #fafbfc;
+
+        .card-header {
+            border-bottom: none;
+            padding: 0;
+            margin: 0;
+        }
+    }
+
+    .el-card__body {
+        padding: 20px;
+    }
+}
+
+// 表格样式优化
+.el-table {
+    th {
+        background: #f9fafb !important;
+        color: $kingdee-text-secondary;
+        font-weight: 600;
+        font-size: 13px;
+        border-bottom: 1px solid $kingdee-border;
+        padding: 12px 0;
+    }
+
+    td {
+        color: $kingdee-text-primary;
+        font-size: 13px;
+        border-bottom: 1px solid $kingdee-border;
+        padding: 12px 0;
+    }
+
+    &.el-table--striped .el-table__body tr.el-table__row--striped td {
+        background: #fafbfc;
+    }
+
+    .el-table__body tr:hover > td {
+        background: #f3f4f6 !important;
+    }
+
+    .el-table__fixed {
+        background: #fff;
+    }
+}
+
+// 表单样式优化
+.el-form {
+    .el-form-item__label {
+        color: $kingdee-text-secondary;
+        font-weight: 500;
+        font-size: 13px;
+    }
+
+    .el-input__inner,
+    .el-textarea__inner,
+    .el-select .el-input__inner,
+    .el-date-editor .el-input__inner {
+        border-color: $kingdee-border;
+        border-radius: 4px;
+        font-size: 13px;
+
+        &:focus {
+            border-color: $kingdee-primary;
+        }
+
+        &::placeholder {
+            color: $kingdee-text-tertiary;
+        }
+    }
+
+    .el-select-dropdown {
+        .el-select-dropdown__item {
+            font-size: 13px;
+        }
+    }
+}
+
+// 按钮样式优化
+.el-button {
+    border-radius: 4px;
+    font-weight: 500;
+    font-size: 13px;
+
+    &--primary {
+        background: $kingdee-primary;
+        border-color: $kingdee-primary;
+
+        &:hover,
+        &:focus {
+            background: lighten($kingdee-primary, 8%);
+            border-color: lighten($kingdee-primary, 8%);
+        }
+    }
+
+    &--success {
+        background: $kingdee-success;
+        border-color: $kingdee-success;
+
+        &:hover,
+        &:focus {
+            background: lighten($kingdee-success, 8%);
+            border-color: lighten($kingdee-success, 8%);
+        }
+    }
+
+    &--warning {
+        background: $kingdee-warning;
+        border-color: $kingdee-warning;
+
+        &:hover,
+        &:focus {
+            background: lighten($kingdee-warning, 8%);
+            border-color: lighten($kingdee-warning, 8%);
+        }
+    }
+
+    &--danger {
+        background: $kingdee-danger;
+        border-color: $kingdee-danger;
+
+        &:hover,
+        &:focus {
+            background: lighten($kingdee-danger, 8%);
+            border-color: lighten($kingdee-danger, 8%);
+        }
+    }
+
+    &--text,
+    &--info,
+    &--default {
+        &:hover {
+            background: #f3f4f6;
+            border-color: #d1d5db;
+        }
+    }
+
+    .el-icon {
+        font-weight: 500;
+    }
+
+    &.is-circle {
+        padding: 12px;
+    }
+
+    &.is-plain {
+        background: transparent !important;
+
+        &.el-button--primary {
+            color: $kingdee-primary;
+            background: rgba(24, 144, 255, 0.1);
+            border-color: rgba(24, 144, 255, 0.2);
+
+            &:hover {
+                background: rgba(24, 144, 255, 0.2);
+                border-color: $kingdee-primary;
+            }
+        }
+    }
+}
+
+// 标签样式
+.el-tag {
+    border-radius: 3px;
+    font-weight: 500;
+    padding: 0 8px;
+    height: 22px;
+    line-height: 22px;
+    font-size: 12px;
+
+    &.el-tag--info {
+        background: #e0e7ff;
+        color: #4f46e5;
+        border-color: #c7d2fe;
+    }
+
+    &.el-tag--success {
+        background: #d1fae5;
+        color: #065f46;
+        border-color: #a7f3d0;
+    }
+
+    &.el-tag--warning {
+        background: #fef3c7;
+        color: #d97706;
+        border-color: #fde68a;
+    }
+
+    &.el-tag--danger {
+        background: #fecaca;
+        color: #991b1b;
+        border-color: #fca5a5;
+    }
+}
+
+// 分页样式
+.el-pagination {
+    .el-pager li {
+        &.number {
+            border-radius: 4px;
+            font-weight: 500;
+            color: $kingdee-text-secondary;
+        }
+
+        &.active {
+            background-color: $kingdee-primary;
+            color: #fff;
+        }
+    }
+
+    button {
+        border-radius: 4px;
+        font-weight: 500;
+    }
+}
+
+// 对话框样式
+.el-dialog {
+    border-radius: 6px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+
+    .el-dialog__header {
+        padding: 16px 20px;
+        border-bottom: 1px solid $kingdee-border;
+        background: #fafbfc;
+
+        .el-dialog__title {
+            font-size: 15px;
+            font-weight: 600;
+            color: $kingdee-text-primary;
+        }
+    }
+
+    .el-dialog__body {
+        padding: 20px;
+    }
+
+    .el-dialog__footer {
+        padding: 12px 20px;
+        border-top: 1px solid $kingdee-border;
+    }
+}
+
+// 消息提示样式
+.el-message {
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border: none;
+    padding: 12px 16px;
+
+    .el-message__icon {
+        font-size: 16px;
+    }
+
+    .el-message__content {
+        font-size: 13px;
+    }
+
+    &.el-message--success {
+        background: #f0f9ff;
+        border-left: 3px solid $kingdee-success;
+    }
+
+    &.el-message--warning {
+        background: #fffbeb;
+        border-left: 3px solid $kingdee-warning;
+    }
+
+    &.el-message--error {
+        background: #fef2f2;
+        border-left: 3px solid $kingdee-danger;
+    }
+}
+
+// 抽屉样式
+.el-drawer {
+    border-radius: 6px 0 0 6px;
+
+    .el-drawer__header {
+        padding: 16px 20px;
+        border-bottom: 1px solid $kingdee-border;
+
+        span {
+            font-size: 15px;
+            font-weight: 600;
+            color: $kingdee-text-primary;
+        }
+    }
+
+    .el-drawer__body {
+        padding: 20px;
+    }
+}
+
+// 面包屑样式
+.el-breadcrumb {
+    font-size: 13px;
+
+    .el-breadcrumb__item {
+        color: $kingdee-text-secondary;
+
+        &:last-child {
+            color: $kingdee-text-primary;
+            font-weight: 500;
+        }
+
+        &:before {
+            color: $kingdee-text-tertiary;
+        }
+    }
+}
+
+// 页面标题样式
+.page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding: 16px 20px;
+    background: #fff;
+    border-radius: 4px;
+    border: 1px solid $kingdee-border;
+
+    .page-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: $kingdee-text-primary;
+    }
+}
+
+// 统计卡片
+.stat-card {
+    background: #fff;
+    border-radius: 4px;
+    padding: 20px 24px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+    border: 1px solid $kingdee-border;
+    transition: all 0.2s ease;
+
+    &:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+}
+
+// 徽章按钮样式优化
+.pagination-container {
+    text-align: right;
+    padding: 16px 0;
+}
+
+// 空状态优化
+.el-empty {
+    padding: 40px 0;
+
+    .el-empty__description {
+        color: $kingdee-text-secondary;
+        font-size: 13px;
+    }
+
+    .el-empty__image {
+        width: 100px;
+    }
+}
+
+// 搜索区域样式
+.search-form {
+    background: #fff;
+    padding: 16px 20px;
+    border-radius: 4px;
+    border: 1px solid $kingdee-border;
+    margin-bottom: 16px;
+}
+
+// 工具栏样式
+.toolbar-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+// 操作列按钮
+.table-operation {
+    .el-button {
+        padding: 5px 10px;
+        font-size: 12px;
+    }
+}
+
+// 状态徽章
+.status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: 500;
+
+    &.status-success {
+        background: #f0f9ff;
+        color: #0ea5e9;
+    }
+
+    &.status-warning {
+        background: #fef3c7;
+        color: #d97706;
+    }
+
+    &.status-danger {
+        background: #fef2f2;
+        color: #dc2626;
+    }
+
+    &.status-info {
+        background: #e0e7ff;
+        color: #4f46e5;
+    }
+}
+
+// 数字显示优化
+.number-display {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-weight: 600;
+}
+
+// 金额显示
+.money-display {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-weight: 600;
+    color: $kingdee-primary;
+}
+
+// 响应式优化
+@media (max-width: 768px) {
+    .app-container {
+        padding: 12px;
+    }
+
+    .el-card {
+        .el-card__header,
+        .el-card__body {
+            padding: 12px 16px;
+        }
+    }
+
+    .stat-card {
+        padding: 16px;
+    }
+}
+
+// 滚动条样式优化
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+
+    &:hover {
+        background: #a8a8a8;
+    }
+}
+
+// 下拉框样式
+.el-select-dropdown {
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border: 1px solid $kingdee-border;
+
+    .el-select-dropdown__item {
+        font-size: 13px;
+
+        &.selected {
+            color: $kingdee-primary;
+            font-weight: 500;
+        }
+
+        &:hover {
+            background: #f3f4f6;
+        }
+    }
+}
+
+// 日期选择器样式
+.el-date-editor {
+    .el-input__inner {
+        border-radius: 4px;
+    }
+}
+
+// 复选框和单选框样式
+.el-checkbox,
+.el-radio {
+    .el-checkbox__label,
+    .el-radio__label {
+        color: $kingdee-text-primary;
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    &.is-checked {
+        .el-checkbox__label,
+        .el-radio__label {
+            color: $kingdee-primary;
+        }
+    }
+}
+
+// 步骤条样式
+.el-steps {
+    .el-step__head {
+        .el-step__icon {
+            border-color: $kingdee-border;
+            color: $kingdee-text-tertiary;
+        }
+
+        &.is-process {
+            .el-step__icon {
+                color: $kingdee-primary;
+            }
+        }
+
+        &.is-finish {
+            .el-step__icon {
+                color: $kingdee-success;
+            }
+        }
+    }
+}
+
+// 进度条样式
+.el-progress {
+    .el-progress-bar__outer {
+        background-color: $kingdee-border;
+    }
+
+    .el-progress-bar__inner {
+        background-color: $kingdee-primary;
+    }
+}
+
+// 开关样式
+.el-switch {
+    &.is-checked {
+        .el-switch__core {
+            background-color: $kingdee-primary;
+            border-color: $kingdee-primary;
+        }
+    }
+}
+
+// 输入框前缀后缀
+.el-input__prefix,
+.el-input__suffix {
+    color: $kingdee-text-secondary;
+}
+
+// 分页输入框
+.el-pagination .el-pagination__editor.el-input .el-input__inner {
+    border-radius: 4px;
+    border-color: $kingdee-border;
+}
+
+// 链接样式
+a {
+    color: $kingdee-primary;
+    text-decoration: none;
+    transition: color 0.2s;
+
+    &:hover {
+        color: lighten($kingdee-primary, 10%);
+    }
+}
+
+// 选择器样式
+.el-select {
+    .el-input__suffix {
+        .el-select__caret {
+            color: $kingdee-text-secondary;
+        }
+    }
+
+    .el-input__inner {
+        color: $kingdee-text-primary;
+    }
+}
+
+// 树形表格
+.el-tree {
+    color: $kingdee-text-primary;
+    font-size: 13px;
+
+    .el-tree-node__content {
+        &:hover {
+            background: #f3f4f6;
+        }
+    }
+
+    .el-tree-node.is-current > .el-tree-node__content {
+        color: $kingdee-primary;
+        font-weight: 600;
+    }
+}

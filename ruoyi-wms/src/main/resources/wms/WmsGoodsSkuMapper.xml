@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.wms.mapper.WmsGoodsSkuMapper">
+
+    <resultMap type="com.ruoyi.wms.domain.WmsGoodsSku" id="WmsGoodsSkuResult">
+        <id     property="id"            column="id"            />
+        <result property="tenantId"      column="tenant_id"     />
+        <result property="goodsId"       column="goods_id"      />
+        <result property="skuCode"       column="sku_code"      />
+        <result property="skuName"       column="sku_name"      />
+        <result property="barcode"       column="barcode"       />
+        <result property="unitId"        column="unit_id"       />
+        <result property="specInfo"      column="spec_info"     />
+        <result property="specIds"       column="spec_ids"      />
+        <result property="purchasePrice" column="purchase_price" />
+        <result property="salePrice"     column="sale_price"    />
+        <result property="wholesalePrice" column="wholesale_price" />
+        <result property="costPrice"     column="cost_price"    />
+        <result property="minStock"      column="min_stock"     />
+        <result property="maxStock"      column="max_stock"     />
+        <result property="image"         column="image"         />
+        <result property="status"        column="status"        />
+        <result property="delFlag"       column="del_flag"      />
+        <result property="createBy"      column="create_by"     />
+        <result property="createTime"    column="create_time"   />
+        <result property="updateBy"      column="update_by"     />
+        <result property="updateTime"    column="update_time"   />
+        <result property="remark"        column="remark"        />
+    </resultMap>
+
+    <resultMap type="com.ruoyi.wms.domain.vo.goodsSku.WmsGoodsSkuRespVO" id="WmsGoodsSkuRespVOResult">
+        <id     property="id"            column="id"            />
+        <result property="goodsId"       column="goods_id"      />
+        <result property="skuCode"       column="sku_code"      />
+        <result property="skuName"       column="sku_name"      />
+        <result property="barcode"       column="barcode"       />
+        <result property="unitId"        column="unit_id"       />
+        <result property="unitName"      column="unit_name"     />
+        <result property="specInfo"      column="spec_info"     />
+        <result property="specIds"       column="spec_ids"      />
+        <result property="purchasePrice" column="purchase_price" />
+        <result property="salePrice"     column="sale_price"    />
+        <result property="wholesalePrice" column="wholesale_price" />
+        <result property="costPrice"     column="cost_price"    />
+        <result property="minStock"      column="min_stock"     />
+        <result property="maxStock"      column="max_stock"     />
+        <result property="image"         column="image"         />
+        <result property="stock"         column="stock"         />
+        <result property="status"        column="status"        />
+        <result property="createTime"    column="create_time"   />
+    </resultMap>
+
+    <select id="selectSkuPage" resultMap="WmsGoodsSkuRespVOResult">
+        SELECT
+            s.id,
+            s.goods_id,
+            s.sku_code,
+            s.sku_name,
+            s.barcode,
+            s.unit_id,
+            u.unit_name,
+            s.spec_info,
+            s.spec_ids,
+            s.purchase_price,
+            s.sale_price,
+            s.wholesale_price,
+            s.cost_price,
+            s.min_stock,
+            s.max_stock,
+            COALESCE(s.image, g.image) AS image,
+            COALESCE(SUM(st.quantity), 0) AS stock,
+            s.status,
+            s.create_time
+        FROM wms_goods_sku s
+        LEFT JOIN wms_unit u ON s.unit_id = u.id
+        LEFT JOIN wms_goods g ON s.goods_id = g.id
+        LEFT JOIN wms_stock st ON s.id = st.sku_id
+        <where>
+            s.del_flag = '0'
+            <if test="reqVO.goodsId != null">
+                AND s.goods_id = #{reqVO.goodsId}
+            </if>
+            <if test="reqVO.skuCode != null and reqVO.skuCode != ''">
+                AND s.sku_code LIKE CONCAT('%', #{reqVO.skuCode}, '%')
+            </if>
+            <if test="reqVO.skuName != null and reqVO.skuName != ''">
+                AND s.sku_name LIKE CONCAT('%', #{reqVO.skuName}, '%')
+            </if>
+            <if test="reqVO.categoryId != null">
+                AND g.category_id = #{reqVO.categoryId}
+            </if>
+            <if test="reqVO.goodsCode != null and reqVO.goodsCode != ''">
+                AND g.goods_code LIKE CONCAT('%', #{reqVO.goodsCode}, '%')
+            </if>
+            <if test="reqVO.goodsName != null and reqVO.goodsName != ''">
+                AND g.goods_name LIKE CONCAT('%', #{reqVO.goodsName}, '%')
+            </if>
+        </where>
+        GROUP BY s.id, s.goods_id, s.sku_code, s.sku_name, s.barcode, s.unit_id, u.unit_name,
+                 s.spec_info, s.spec_ids, s.purchase_price, s.sale_price, s.wholesale_price,
+                 s.cost_price, s.min_stock, s.max_stock, s.image, g.image, s.status, s.create_time
+        ORDER BY s.create_time DESC
+    </select>
+
+</mapper>

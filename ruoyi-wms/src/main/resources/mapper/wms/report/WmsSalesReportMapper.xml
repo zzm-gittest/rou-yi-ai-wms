@@ -1,0 +1,533 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.wms.mapper.report.WmsSalesReportMapper">
+
+    <select id="getTodaySalesOut" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(so.total_amount), 0)
+        FROM wms_sales_out so
+        WHERE so.del_flag = '0'
+          AND so.tenant_id = #{tenantId}
+          AND so.approve_by IS NOT NULL
+          AND so.approve_by != ''
+          AND DATE(so.create_time) = CURDATE()
+          <if test="warehouseId != null and warehouseId != 0">
+              AND so.warehouse_id = #{warehouseId}
+          </if>
+    </select>
+
+    <select id="getTodaySalesReturn" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(sr.total_amount), 0)
+        FROM wms_sales_return sr
+        WHERE sr.del_flag = '0'
+          AND sr.tenant_id = #{tenantId}
+          AND sr.approve_by IS NOT NULL
+          AND sr.approve_by != ''
+          AND DATE(sr.create_time) = CURDATE()
+          <if test="warehouseId != null and warehouseId != 0">
+              AND sr.warehouse_id = #{warehouseId}
+          </if>
+    </select>
+
+    <select id="getTodaySalesOutCost" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(COALESCE(l.quantity, 0) * COALESCE(l.cost_price, 0)), 0)
+        FROM wms_stock_log l
+        INNER JOIN wms_sales_out so ON so.id = l.bill_id
+        WHERE l.bill_type = '2'
+          AND l.change_type = '2'
+          AND so.del_flag = '0'
+          AND so.tenant_id = #{tenantId}
+          AND so.approve_by IS NOT NULL
+          AND so.approve_by != ''
+          AND DATE(so.create_time) = CURDATE()
+          <if test="warehouseId != null and warehouseId != 0">
+              AND so.warehouse_id = #{warehouseId}
+          </if>
+    </select>
+
+    <select id="getTodaySalesReturnCost" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(COALESCE(l.quantity, 0) * COALESCE(l.cost_price, 0)), 0)
+        FROM wms_stock_log l
+        INNER JOIN wms_sales_return sr ON sr.id = l.bill_id
+        WHERE l.bill_type = '4'
+          AND l.change_type = '1'
+          AND sr.del_flag = '0'
+          AND sr.tenant_id = #{tenantId}
+          AND sr.approve_by IS NOT NULL
+          AND sr.approve_by != ''
+          AND DATE(sr.create_time) = CURDATE()
+          <if test="warehouseId != null and warehouseId != 0">
+              AND sr.warehouse_id = #{warehouseId}
+          </if>
+    </select>
+
+    <select id="getTodayPurchaseIn" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(pi.total_amount), 0)
+        FROM wms_purchase_in pi
+        WHERE pi.del_flag = '0'
+          AND pi.tenant_id = #{tenantId}
+          AND pi.approve_by IS NOT NULL
+          AND pi.approve_by != ''
+          AND DATE(pi.create_time) = CURDATE()
+          <if test="warehouseId != null and warehouseId != 0">
+              AND pi.warehouse_id = #{warehouseId}
+          </if>
+    </select>
+
+    <select id="getTodayPurchaseReturn" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(pr.total_amount), 0)
+        FROM wms_purchase_return pr
+        WHERE pr.del_flag = '0'
+          AND pr.tenant_id = #{tenantId}
+          AND pr.approve_by IS NOT NULL
+          AND pr.approve_by != ''
+          AND DATE(pr.create_time) = CURDATE()
+          <if test="warehouseId != null and warehouseId != 0">
+              AND pr.warehouse_id = #{warehouseId}
+          </if>
+    </select>
+
+    <select id="getLastUpdateTime" resultType="java.time.LocalDateTime">
+        SELECT MAX(so.create_time)
+        FROM wms_sales_out so
+        WHERE so.del_flag = '0'
+          AND so.tenant_id = #{tenantId}
+          <if test="warehouseId != null and warehouseId != 0">
+              AND so.warehouse_id = #{warehouseId}
+          </if>
+    </select>
+
+    <!-- 查询销售日报表 -->
+    <select id="querySalesDailyReport" resultType="com.ruoyi.wms.domain.report.vo.SalesDailyReportVO">
+        SELECT
+            <choose>
+                <when test="groupBy == 'date'">
+                    t.report_date AS reportDate,
+                    NULL AS customerId,
+                    '全部' AS customerName,
+                    NULL AS warehouseId,
+                    '全部' AS warehouseName
+                </when>
+                <when test="groupBy == 'date_customer'">
+                    t.report_date AS reportDate,
+                    t.customer_id AS customerId,
+                    COALESCE(c.customer_name, '未知') AS customerName,
+                    NULL AS warehouseId,
+                    '全部' AS warehouseName
+                </when>
+                <when test="groupBy == 'date_warehouse'">
+                    t.report_date AS reportDate,
+                    NULL AS customerId,
+                    '全部' AS customerName,
+                    t.warehouse_id AS warehouseId,
+                    COALESCE(w.warehouse_name, '全部') AS warehouseName
+                </when>
+                <when test="groupBy == 'date_customer_warehouse'">
+                    t.report_date AS reportDate,
+                    t.customer_id AS customerId,
+                    COALESCE(c.customer_name, '未知') AS customerName,
+                    t.warehouse_id AS warehouseId,
+                    COALESCE(w.warehouse_name, '全部') AS warehouseName
+                </when>
+                <when test="groupBy == 'customer'">
+                    NULL AS reportDate,
+                    t.customer_id AS customerId,
+                    COALESCE(c.customer_name, '未知') AS customerName,
+                    NULL AS warehouseId,
+                    '全部' AS warehouseName
+                </when>
+                <when test="groupBy == 'warehouse'">
+                    NULL AS reportDate,
+                    NULL AS customerId,
+                    '全部' AS customerName,
+                    t.warehouse_id AS warehouseId,
+                    COALESCE(w.warehouse_name, '全部') AS warehouseName
+                </when>
+                <when test="groupBy == 'customer_warehouse'">
+                    NULL AS reportDate,
+                    t.customer_id AS customerId,
+                    COALESCE(c.customer_name, '未知') AS customerName,
+                    t.warehouse_id AS warehouseId,
+                    COALESCE(w.warehouse_name, '全部') AS warehouseName
+                </when>
+                <otherwise>
+                    t.report_date AS reportDate,
+                    NULL AS customerId,
+                    '全部' AS customerName,
+                    NULL AS warehouseId,
+                    '全部' AS warehouseName
+                </otherwise>
+            </choose>,
+            COALESCE(SUM(t.order_count), 0) AS orderCount,
+            COALESCE(SUM(t.order_amount), 0) AS orderAmount,
+            COALESCE(SUM(t.out_count), 0) AS outCount,
+            COALESCE(SUM(t.out_amount), 0) AS outAmount,
+            COALESCE(SUM(t.return_count), 0) AS returnCount,
+            COALESCE(SUM(t.return_amount), 0) AS returnAmount,
+            COALESCE(SUM(t.out_amount), 0) - COALESCE(SUM(t.return_amount), 0) AS netSales
+        FROM (
+            -- 销售订单（当未选择仓库筛选时才统计）
+            SELECT
+                DATE(so.create_time) AS report_date,
+                so.customer_id,
+                CAST(NULL AS SIGNED) AS warehouse_id,
+                COUNT(DISTINCT so.id) AS order_count,
+                COALESCE(SUM(so.total_amount), 0) AS order_amount,
+                0 AS out_count,
+                0 AS out_amount,
+                0 AS return_count,
+                0 AS return_amount
+            FROM wms_sales_order so
+            WHERE so.del_flag = 0
+                <if test="startDate != null and endDate != null">
+                    AND DATE(so.create_time) BETWEEN #{startDate} AND #{endDate}
+                </if>
+                <if test="startDate == null or endDate == null">
+                    AND DATE(so.create_time) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                </if>
+                <if test="customerIds != null and customerIds.size() > 0">
+                    AND so.customer_id IN
+                    <foreach collection="customerIds" item="id" open="(" separator="," close=")">
+                        #{id}
+                    </foreach>
+                </if>
+                <!-- 当选择仓库筛选时，不统计销售订单（因为订单未出库，无仓库信息） -->
+                <if test="warehouseIds != null and warehouseIds.size() > 0">
+                    AND 1 = 0
+                </if>
+            GROUP BY DATE(so.create_time), so.customer_id
+
+            UNION ALL
+
+            -- 销售出库（只关联有效仓库）
+            SELECT
+                DATE(sout.create_time) AS report_date,
+                sout.customer_id,
+                sout.warehouse_id,
+                0 AS order_count,
+                0 AS order_amount,
+                COUNT(DISTINCT sout.id) AS out_count,
+                COALESCE(SUM(sout.total_amount), 0) AS out_amount,
+                0 AS return_count,
+                0 AS return_amount
+            FROM wms_sales_out sout
+            INNER JOIN wms_warehouse w ON sout.warehouse_id = w.id AND w.del_flag = '0'
+            WHERE sout.del_flag = 0
+                <if test="startDate != null and endDate != null">
+                    AND DATE(sout.create_time) BETWEEN #{startDate} AND #{endDate}
+                </if>
+                <if test="startDate == null or endDate == null">
+                    AND DATE(sout.create_time) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                </if>
+                <if test="customerIds != null and customerIds.size() > 0">
+                    AND sout.customer_id IN
+                    <foreach collection="customerIds" item="id" open="(" separator="," close=")">
+                        #{id}
+                    </foreach>
+                </if>
+                <if test="warehouseIds != null and warehouseIds.size() > 0">
+                    AND sout.warehouse_id IN
+                    <foreach collection="warehouseIds" item="id" open="(" separator="," close=")">
+                        #{id}
+                    </foreach>
+                </if>
+            GROUP BY DATE(sout.create_time), sout.customer_id, sout.warehouse_id
+
+            UNION ALL
+
+            -- 销售退货（只关联有效仓库）
+            SELECT
+                DATE(sr.create_time) AS report_date,
+                sr.customer_id,
+                sr.warehouse_id,
+                0 AS order_count,
+                0 AS order_amount,
+                0 AS out_count,
+                0 AS out_amount,
+                COUNT(DISTINCT sr.id) AS return_count,
+                COALESCE(SUM(sr.total_amount), 0) AS return_amount
+            FROM wms_sales_return sr
+            INNER JOIN wms_warehouse w ON sr.warehouse_id = w.id AND w.del_flag = '0'
+            WHERE sr.del_flag = 0
+                <if test="startDate != null and endDate != null">
+                    AND DATE(sr.create_time) BETWEEN #{startDate} AND #{endDate}
+                </if>
+                <if test="startDate == null or endDate == null">
+                    AND DATE(sr.create_time) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                </if>
+                <if test="customerIds != null and customerIds.size() > 0">
+                    AND sr.customer_id IN
+                    <foreach collection="customerIds" item="id" open="(" separator="," close=")">
+                        #{id}
+                    </foreach>
+                </if>
+                <if test="warehouseIds != null and warehouseIds.size() > 0">
+                    AND sr.warehouse_id IN
+                    <foreach collection="warehouseIds" item="id" open="(" separator="," close=")">
+                        #{id}
+                    </foreach>
+                </if>
+            GROUP BY DATE(sr.create_time), sr.customer_id, sr.warehouse_id
+        ) t
+        LEFT JOIN wms_customer c ON t.customer_id = c.id AND c.del_flag = '0'
+        LEFT JOIN wms_warehouse w ON t.warehouse_id = w.id AND w.del_flag = '0'
+        GROUP BY
+            <choose>
+                <when test="groupBy == 'date'">
+                    t.report_date
+                </when>
+                <when test="groupBy == 'date_customer'">
+                    t.report_date, t.customer_id, c.customer_name
+                </when>
+                <when test="groupBy == 'date_warehouse'">
+                    t.report_date, t.warehouse_id, w.warehouse_name
+                </when>
+                <when test="groupBy == 'date_customer_warehouse'">
+                    t.report_date, t.customer_id, c.customer_name, t.warehouse_id, w.warehouse_name
+                </when>
+                <when test="groupBy == 'customer'">
+                    t.customer_id, c.customer_name
+                </when>
+                <when test="groupBy == 'warehouse'">
+                    t.warehouse_id, w.warehouse_name
+                </when>
+                <when test="groupBy == 'customer_warehouse'">
+                    t.customer_id, c.customer_name, t.warehouse_id, w.warehouse_name
+                </when>
+                <otherwise>
+                    t.report_date
+                </otherwise>
+            </choose>
+        ORDER BY
+            <choose>
+                <when test="groupBy == 'date'">
+                    t.report_date DESC
+                </when>
+                <when test="groupBy == 'date_customer'">
+                    t.report_date DESC, c.customer_name
+                </when>
+                <when test="groupBy == 'date_warehouse'">
+                    t.report_date DESC, w.warehouse_name
+                </when>
+                <when test="groupBy == 'date_customer_warehouse'">
+                    t.report_date DESC, c.customer_name, w.warehouse_name
+                </when>
+                <when test="groupBy == 'customer'">
+                    c.customer_name
+                </when>
+                <when test="groupBy == 'warehouse'">
+                    w.warehouse_name
+                </when>
+                <when test="groupBy == 'customer_warehouse'">
+                    c.customer_name, w.warehouse_name
+                </when>
+                <otherwise>
+                    t.report_date DESC
+                </otherwise>
+            </choose>
+    </select>
+
+    <!-- 查询商品销售排行榜 -->
+    <select id="queryGoodsRankReport" resultType="com.ruoyi.wms.domain.report.vo.GoodsRankReportVO">
+        SELECT
+            @rownum := @rownum + 1 AS rankNo,
+            t.goodsCode,
+            t.goodsName,
+            t.spec,
+            t.unit,
+            t.categoryName,
+            t.warehouseName,
+            t.saleQuantity,
+            t.saleAmount,
+            t.costAmount,
+            t.profitAmount,
+            t.profitRate
+        FROM (
+            SELECT
+                sku.sku_code AS goodsCode,
+                COALESCE(spu.goods_name, sku.sku_name) AS goodsName,
+                sku.spec_info AS spec,
+                sku.unit_name AS unit,
+                <choose>
+                    <when test="categoryIds != null and categoryIds.size() > 0">
+                        cat.category_name AS categoryName,
+                    </when>
+                    <otherwise>
+                        NULL AS categoryName,
+                    </otherwise>
+                </choose>
+                <choose>
+                    <when test="warehouseIds != null and warehouseIds.size() > 0">
+                        w.warehouse_name AS warehouseName,
+                    </when>
+                    <otherwise>
+                        NULL AS warehouseName,
+                    </otherwise>
+                </choose>
+                SUM(sout_item.quantity) AS saleQuantity,
+                SUM(sout_item.amount) AS saleAmount,
+                SUM(sout_item.quantity * COALESCE(sku.cost_price, 0)) AS costAmount,
+                SUM(sout_item.amount - sout_item.quantity * COALESCE(sku.cost_price, 0)) AS profitAmount,
+                CASE WHEN SUM(sout_item.amount) > 0
+                    THEN ROUND((SUM(sout_item.amount - sout_item.quantity * COALESCE(sku.cost_price, 0)) / SUM(sout_item.amount)) * 100, 2)
+                    ELSE 0 END AS profitRate
+            FROM wms_sales_out_item sout_item
+            INNER JOIN wms_sales_out sout ON sout_item.out_id = sout.id
+            INNER JOIN wms_goods_sku sku ON sout_item.sku_id = sku.id
+            INNER JOIN wms_warehouse w ON sout.warehouse_id = w.id AND w.del_flag = '0'
+            LEFT JOIN wms_goods spu ON sku.goods_id = spu.id
+            <if test="categoryIds != null and categoryIds.size() > 0">
+                LEFT JOIN wms_goods_category cat ON spu.category_id = cat.id
+            </if>
+            WHERE sout.del_flag = 0
+                <if test="startDate != null and endDate != null">
+                    AND DATE(sout.create_time) BETWEEN #{startDate} AND #{endDate}
+                </if>
+                <if test="startDate == null or endDate == null">
+                    AND DATE(sout.create_time) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                </if>
+                <if test="categoryIds != null and categoryIds.size() > 0">
+                    AND spu.category_id IN
+                    <foreach collection="categoryIds" item="id" open="(" separator="," close=")">
+                        #{id}
+                    </foreach>
+                </if>
+                <if test="warehouseIds != null and warehouseIds.size() > 0">
+                    AND sout.warehouse_id IN
+                    <foreach collection="warehouseIds" item="id" open="(" separator="," close=")">
+                        #{id}
+                    </foreach>
+                </if>
+            GROUP BY sku.sku_code, sku.sku_name, spu.goods_name, sku.spec_info, sku.unit_name
+                <if test="categoryIds != null and categoryIds.size() > 0">
+                    , cat.category_name
+                </if>
+                <if test="warehouseIds != null and warehouseIds.size() > 0">
+                    , w.warehouse_name
+                </if>
+            ORDER BY
+                <choose>
+                    <when test="orderBy != null and orderBy == 'quantity'">
+                        SUM(sout_item.quantity) DESC
+                    </when>
+                    <when test="orderBy != null and orderBy == 'profit'">
+                        SUM(sout_item.amount - sout_item.quantity * COALESCE(sku.cost_price, 0)) DESC
+                    </when>
+                    <otherwise>
+                        SUM(sout_item.amount) DESC
+                    </otherwise>
+                </choose>
+            LIMIT 100
+        ) t, (SELECT @rownum := 0) r
+    </select>
+
+    <!-- 查询客户销售分析表 -->
+    <select id="queryCustomerAnalysisReport" resultType="com.ruoyi.wms.domain.report.vo.CustomerAnalysisReportVO">
+        SELECT * FROM (
+            SELECT
+                c.customer_code AS customerCode,
+                c.customer_name AS customerName,
+                c.contact,
+                c.phone,
+                COALESCE(order_counts.cnt, 0) AS orderCount,
+                COALESCE(order_amounts.amt, 0) AS orderAmount,
+                COALESCE(out_amounts.amt, 0) AS outAmount,
+                COALESCE(return_amounts.amt, 0) AS returnAmount,
+                COALESCE(out_amounts.amt, 0) - COALESCE(return_amounts.amt, 0) AS netSales,
+                COALESCE(out_amounts.amt, 0) - COALESCE(received_totals.amt, 0) AS arAmount,
+                COALESCE(received_totals.amt, 0) AS receivedAmount,
+                CASE WHEN COALESCE(out_amounts.amt, 0) > 0
+                    THEN ROUND((COALESCE(received_totals.amt, 0) / out_amounts.amt) * 100, 2)
+                    ELSE 0 END AS receiptRate,
+                MAX(so.create_time) AS lastOrderDate
+            FROM wms_customer c
+            <if test="customerIds != null and customerIds.size() > 0">
+                INNER JOIN (SELECT id FROM wms_customer WHERE id IN
+                <foreach collection="customerIds" item="id" open="(" separator="," close=")">
+                    #{id}
+                </foreach>
+                ) filtered_customers ON c.id = filtered_customers.id
+            </if>
+            LEFT JOIN (
+                SELECT customer_id, COUNT(*) AS cnt, SUM(total_amount) AS amt
+                FROM wms_sales_order
+                WHERE del_flag = 0
+                    <choose>
+                        <when test="startDate != null and endDate != null">
+                            AND DATE(create_time) BETWEEN #{startDate} AND #{endDate}
+                        </when>
+                        <otherwise>
+                            AND DATE(create_time) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                        </otherwise>
+                    </choose>
+                GROUP BY customer_id
+            ) order_counts ON c.id = order_counts.customer_id
+            LEFT JOIN (
+                SELECT customer_id, SUM(total_amount) AS amt
+                FROM wms_sales_order
+                WHERE del_flag = 0
+                    <choose>
+                        <when test="startDate != null and endDate != null">
+                            AND DATE(create_time) BETWEEN #{startDate} AND #{endDate}
+                        </when>
+                        <otherwise>
+                            AND DATE(create_time) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                        </otherwise>
+                    </choose>
+                GROUP BY customer_id
+            ) order_amounts ON c.id = order_amounts.customer_id
+            LEFT JOIN (
+                SELECT customer_id, SUM(total_amount) AS amt
+                FROM wms_sales_out
+                WHERE del_flag = 0
+                    <choose>
+                        <when test="startDate != null and endDate != null">
+                            AND DATE(create_time) BETWEEN #{startDate} AND #{endDate}
+                        </when>
+                        <otherwise>
+                            AND DATE(create_time) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                        </otherwise>
+                    </choose>
+                GROUP BY customer_id
+            ) out_amounts ON c.id = out_amounts.customer_id
+            LEFT JOIN (
+                SELECT customer_id, SUM(total_amount) AS amt
+                FROM wms_sales_return
+                WHERE del_flag = 0
+                    <choose>
+                        <when test="startDate != null and endDate != null">
+                            AND DATE(create_time) BETWEEN #{startDate} AND #{endDate}
+                        </when>
+                        <otherwise>
+                            AND DATE(create_time) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                        </otherwise>
+                    </choose>
+                GROUP BY customer_id
+            ) return_amounts ON c.id = return_amounts.customer_id
+            LEFT JOIN (
+                SELECT sout.customer_id,
+                       SUM(sout.received_amount) AS amt
+                FROM wms_sales_out sout
+                WHERE sout.del_flag = 0
+                    <choose>
+                        <when test="startDate != null and endDate != null">
+                            AND DATE(sout.create_time) BETWEEN #{startDate} AND #{endDate}
+                        </when>
+                        <otherwise>
+                            AND DATE(sout.create_time) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                        </otherwise>
+                    </choose>
+                GROUP BY sout.customer_id
+            ) received_totals ON c.id = received_totals.customer_id
+            LEFT JOIN wms_sales_order so ON c.id = so.customer_id AND so.del_flag = 0
+            WHERE c.del_flag = 0
+            GROUP BY c.id, c.customer_code, c.customer_name, c.contact, c.phone,
+                     order_counts.cnt, order_amounts.amt, out_amounts.amt, return_amounts.amt,
+                     received_totals.amt
+        ) t
+        WHERE orderAmount > 0 OR outAmount > 0
+        ORDER BY netSales DESC
+    </select>
+
+</mapper>

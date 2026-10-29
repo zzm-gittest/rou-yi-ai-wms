@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.wms.mapper.report.WmsFinanceReportMapper">
+
+    <!-- 查询应收账款账龄分析表 -->
+    <select id="queryArAgingReport" resultType="com.ruoyi.wms.domain.report.vo.ArAgingReportVO">
+        SELECT
+            c.customer_code AS customerCode,
+            c.customer_name AS customerName,
+            SUM(ar.ar_amount) AS totalAr,
+            SUM(CASE WHEN DATEDIFF(#{statisticsDate}, ar.bill_date) &lt;= 30 THEN ar.ar_amount ELSE 0 END) AS within30,
+            SUM(CASE WHEN DATEDIFF(#{statisticsDate}, ar.bill_date) BETWEEN 31 AND 60 THEN ar.ar_amount ELSE 0 END) AS days30_60,
+            SUM(CASE WHEN DATEDIFF(#{statisticsDate}, ar.bill_date) BETWEEN 61 AND 90 THEN ar.ar_amount ELSE 0 END) AS days60_90,
+            SUM(CASE WHEN DATEDIFF(#{statisticsDate}, ar.bill_date) BETWEEN 91 AND 180 THEN ar.ar_amount ELSE 0 END) AS days90_180,
+            SUM(CASE WHEN DATEDIFF(#{statisticsDate}, ar.bill_date) &gt; 180 THEN ar.ar_amount ELSE 0 END) AS over180,
+            SUM(CASE WHEN ar.due_date IS NOT NULL AND #{statisticsDate} &gt; ar.due_date
+                THEN ar.ar_amount ELSE 0 END) AS overdueAmount,
+            CASE WHEN SUM(ar.ar_amount) > 0
+                THEN ROUND((SUM(CASE WHEN ar.due_date IS NOT NULL AND #{statisticsDate} &gt; ar.due_date
+                    THEN ar.ar_amount ELSE 0 END) / SUM(ar.ar_amount)) * 100, 2)
+                ELSE 0 END AS overdueRate
+        FROM wms_accounts_receivable ar
+        INNER JOIN wms_customer c ON ar.customer_id = c.id
+        WHERE ar.ar_status = '0'
+            <if test="customerIds != null and customerIds.size() > 0">
+                AND ar.customer_id IN
+                <foreach collection="customerIds" item="id" open="(" separator="," close=")">
+                    #{id}
+                </foreach>
+            </if>
+        GROUP BY c.id, c.customer_code, c.customer_name
+        HAVING SUM(ar.ar_amount) > 0
+        ORDER BY totalAr DESC
+    </select>
+
+    <!-- 查询供应商采购分析表 -->
+    <select id="querySupplierAnalysisReport" resultType="com.ruoyi.wms.domain.report.vo.SupplierAnalysisReportVO">
+        SELECT * FROM (
+            SELECT
+                s.supplier_code AS supplierCode,
+                s.supplier_name AS supplierName,
+                s.contact,
+                s.phone,
+                COALESCE(order_counts.cnt, 0) AS orderCount,
+                COALESCE(order_amounts.amt, 0) AS orderAmount,
+                COALESCE(in_amounts.amt, 0) AS inAmount,
+                COALESCE(return_amounts.amt, 0) AS returnAmount,
+                COALESCE(in_amounts.amt, 0) - COALESCE(return_amounts.amt, 0) AS netPurchase,
+                COALESCE(in_amounts.amt, 0) - COALESCE(paid_totals.amt, 0) AS apAmount,
+                COALESCE(paid_totals.amt, 0) AS paidAmount,
+                CASE WHEN COALESCE(in_amounts.amt, 0) > 0
+                    THEN ROUND((COALESCE(paid_totals.amt, 0) / in_amounts.amt) * 100, 2)
+                    ELSE 0 END AS paymentRate,
+                COALESCE(avg_prices.price, 0) AS avgPrice,
+                last_order_dates.max_date AS lastOrderDate
+            FROM wms_supplier s
+            <if test="supplierIds != null and supplierIds.size() > 0">
+                INNER JOIN (SELECT id FROM wms_supplier WHERE id IN
+                <foreach collection="supplierIds" item="id" open="(" separator="," close=")">
+                    #{id}
+                </foreach>
+                ) filtered_suppliers ON s.id = filtered_suppliers.id
+            </if>
+            LEFT JOIN (
+                SELECT supplier_id, COUNT(*) AS cnt, SUM(total_amount) AS amt
+                FROM wms_purchase_order
+                WHERE del_flag = '0'
+                    <choose>
+                        <when test="startDate != null and endDate != null">
+                            AND order_date BETWEEN #{startDate} AND #{endDate}
+                        </when>
+                        <otherwise>
+                            AND order_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                        </otherwise>
+                    </choose>
+                    <if test="supplierIds != null and supplierIds.size() > 0">
+                        AND supplier_id IN
+                        <foreach collection="supplierIds" item="id" open="(" separator="," close=")">
+                            #{id}
+                        </foreach>
+                    </if>
+                GROUP BY supplier_id
+            ) order_counts ON s.id = order_counts.supplier_id
+            LEFT JOIN (
+                SELECT supplier_id, SUM(total_amount) AS amt
+                FROM wms_purchase_order
+                WHERE del_flag = '0'
+                    <choose>
+                        <when test="startDate != null and endDate != null">
+                            AND order_date BETWEEN #{startDate} AND #{endDate}
+                        </when>
+                        <otherwise>
+                            AND order_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                        </otherwise>
+                    </choose>
+                    <if test="supplierIds != null and supplierIds.size() > 0">
+                        AND supplier_id IN
+                        <foreach collection="supplierIds" item="id" open="(" separator="," close=")">
+                            #{id}
+                        </foreach>
+                    </if>
+                GROUP BY supplier_id
+            ) order_amounts ON s.id = order_amounts.supplier_id
+            LEFT JOIN (
+                SELECT supplier_id, SUM(total_amount) AS amt
+                FROM wms_purchase_in
+                WHERE del_flag = '0' AND status = '1'
+                    <choose>
+                        <when test="startDate != null and endDate != null">
+                            AND in_date BETWEEN #{startDate} AND #{endDate}
+                        </when>
+                        <otherwise>
+                            AND in_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                        </otherwise>
+                    </choose>
+                    <if test="supplierIds != null and supplierIds.size() > 0">
+                        AND supplier_id IN
+                        <foreach collection="supplierIds" item="id" open="(" separator="," close=")">
+                            #{id}
+                        </foreach>
+                    </if>
+                GROUP BY supplier_id
+            ) in_amounts ON s.id = in_amounts.supplier_id
+            LEFT JOIN (
+                SELECT supplier_id, SUM(total_amount) AS amt
+                FROM wms_purchase_return
+                WHERE del_flag = '0' AND status = '1'
+                    <choose>
+                        <when test="startDate != null and endDate != null">
+                            AND return_date BETWEEN #{startDate} AND #{endDate}
+                        </when>
+                        <otherwise>
+                            AND return_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                        </otherwise>
+                    </choose>
+                    <if test="supplierIds != null and supplierIds.size() > 0">
+                        AND supplier_id IN
+                        <foreach collection="supplierIds" item="id" open="(" separator="," close=")">
+                            #{id}
+                        </foreach>
+                    </if>
+                GROUP BY supplier_id
+            ) return_amounts ON s.id = return_amounts.supplier_id
+            LEFT JOIN (
+                SELECT supplier_id, SUM(paid_amount) AS amt
+                FROM wms_purchase_in
+                WHERE del_flag = '0' AND status = '1'
+                    <choose>
+                        <when test="startDate != null and endDate != null">
+                            AND in_date BETWEEN #{startDate} AND #{endDate}
+                        </when>
+                        <otherwise>
+                            AND in_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                        </otherwise>
+                    </choose>
+                    <if test="supplierIds != null and supplierIds.size() > 0">
+                        AND supplier_id IN
+                        <foreach collection="supplierIds" item="id" open="(" separator="," close=")">
+                            #{id}
+                        </foreach>
+                    </if>
+                GROUP BY supplier_id
+            ) paid_totals ON s.id = paid_totals.supplier_id
+            LEFT JOIN (
+                SELECT pi.supplier_id, AVG(pii.price) AS price
+                FROM wms_purchase_in_item pii
+                INNER JOIN wms_purchase_in pi ON pii.in_id = pi.id
+                WHERE pi.del_flag = '0' AND pi.status = '1'
+                    <choose>
+                        <when test="startDate != null and endDate != null">
+                            AND pi.in_date BETWEEN #{startDate} AND #{endDate}
+                        </when>
+                        <otherwise>
+                            AND pi.in_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                        </otherwise>
+                    </choose>
+                    <if test="supplierIds != null and supplierIds.size() > 0">
+                        AND pi.supplier_id IN
+                        <foreach collection="supplierIds" item="id" open="(" separator="," close=")">
+                            #{id}
+                        </foreach>
+                    </if>
+                GROUP BY pi.supplier_id
+            ) avg_prices ON s.id = avg_prices.supplier_id
+            LEFT JOIN (
+                SELECT supplier_id, MAX(order_date) AS max_date
+                FROM wms_purchase_order
+                WHERE del_flag = '0'
+                GROUP BY supplier_id
+            ) last_order_dates ON s.id = last_order_dates.supplier_id
+            WHERE s.del_flag = '0'
+        ) t
+        WHERE orderAmount > 0 OR inAmount > 0
+        ORDER BY netPurchase DESC
+    </select>
+
+</mapper>

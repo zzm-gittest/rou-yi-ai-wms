@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.AiPointsLogMapper">
+
+	<resultMap type="com.ruoyi.common.core.domain.entity.AiPointsLog" id="AiPointsLogResult">
+		<id     property="id"           column="id"             />
+		<result property="tenantId"     column="tenant_id"      />
+		<result property="changeType"   column="change_type"    />
+		<result property="changeAmount" column="change_amount"  />
+		<result property="balanceAfter" column="balance_after"  />
+		<result property="source"       column="source"         />
+		<result property="bizId"        column="biz_id"         />
+		<result property="remark"       column="remark"         />
+		<result property="createTime"   column="create_time"    />
+	</resultMap>
+
+	<insert id="insertLog" parameterType="com.ruoyi.common.core.domain.entity.AiPointsLog" useGeneratedKeys="true" keyProperty="id">
+		INSERT INTO ai_points_log (tenant_id, change_type, change_amount, balance_after, source, biz_id, remark, create_time)
+		VALUES (#{tenantId}, #{changeType}, #{changeAmount}, #{balanceAfter}, #{source}, #{bizId}, #{remark}, NOW())
+	</insert>
+
+	<select id="selectLogsByTenantId" resultMap="AiPointsLogResult">
+		SELECT id, tenant_id, change_type, change_amount, balance_after, source, biz_id, remark, create_time
+		FROM ai_points_log
+		WHERE tenant_id = #{tenantId}
+		ORDER BY create_time DESC
+		LIMIT #{limit}
+	</select>
+
+	<select id="countByBizId" resultType="int">
+		SELECT COUNT(1) FROM ai_points_log WHERE biz_id = #{bizId} AND change_type = 'charge'
+	</select>
+
+</mapper>

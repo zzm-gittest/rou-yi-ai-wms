@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.wms.mapper.WmsAccountsPayableMapper">
+
+    <resultMap type="com.ruoyi.wms.domain.WmsAccountsPayable" id="WmsAccountsPayableResult">
+        <id     property="id"            column="id"            />
+        <result property="supplierId"    column="supplier_id"   />
+        <result property="customerId"    column="customer_id"   />
+        <result property="billType"      column="bill_type"     />
+        <result property="billNo"        column="bill_no"       />
+        <result property="billId"        column="bill_id"       />
+        <result property="billAmount"    column="bill_amount"   />
+        <result property="paidAmount"    column="paid_amount"   />
+        <result property="apAmount"      column="ap_amount"     />
+        <result property="apStatus"      column="ap_status"     />
+        <result property="billDate"      column="bill_date"     />
+        <result property="dueDate"       column="due_date"      />
+        <result property="createTime"    column="create_time"   />
+    </resultMap>
+
+    <resultMap type="com.ruoyi.wms.domain.vo.accountsPayable.WmsAccountsPayableRespVO" id="WmsAccountsPayableRespVOResult">
+        <id     property="id"            column="id"            />
+        <result property="supplierId"    column="supplier_id"   />
+        <result property="supplierName"  column="supplier_name" />
+        <result property="customerId"    column="customer_id"   />
+        <result property="customerName"  column="customer_name" />
+        <result property="billType"      column="bill_type"     />
+        <result property="billNo"        column="bill_no"       />
+        <result property="billId"        column="bill_id"       />
+        <result property="billAmount"    column="bill_amount"   />
+        <result property="paidAmount"    column="paid_amount"   />
+        <result property="apAmount"      column="ap_amount"     />
+        <result property="apStatus"      column="ap_status"     />
+        <result property="billDate"      column="bill_date"     />
+        <result property="dueDate"       column="due_date"      />
+    </resultMap>
+
+    <select id="selectApPage" resultMap="WmsAccountsPayableRespVOResult">
+        SELECT
+            ap.id,
+            ap.supplier_id,
+            s.supplier_name,
+            ap.customer_id,
+            c.customer_name,
+            ap.bill_type,
+            CASE ap.bill_type
+                WHEN '1' THEN '采购订单'
+                WHEN '2' THEN '采购入库'
+                WHEN '3' THEN '销售退货'
+                ELSE '未知'
+            END AS bill_type_name,
+            ap.bill_no,
+            ap.bill_id,
+            ap.bill_amount,
+            IFNULL(ap.paid_amount, 0) AS paid_amount,
+            ap.ap_amount,
+            ap.ap_status,
+            CASE ap.ap_status
+                WHEN '0' THEN '未结清'
+                WHEN '1' THEN '已结清'
+                ELSE '未知'
+            END AS ap_status_name,
+            ap.bill_date,
+            ap.due_date
+        FROM wms_accounts_payable ap
+        LEFT JOIN wms_supplier s ON ap.supplier_id = s.id
+        LEFT JOIN wms_customer c ON ap.customer_id = c.id
+        WHERE 1=1
+        <if test="reqVO.supplierId != null">
+            AND ap.supplier_id = #{reqVO.supplierId}
+        </if>
+        <if test="reqVO.supplierName != null and reqVO.supplierName != ''">
+            AND s.supplier_name LIKE CONCAT('%', #{reqVO.supplierName}, '%')
+        </if>
+        <if test="reqVO.billNo != null and reqVO.billNo != ''">
+            AND ap.bill_no LIKE CONCAT('%', #{reqVO.billNo}, '%')
+        </if>
+        <if test="reqVO.billType != null and reqVO.billType != ''">
+            AND ap.bill_type = #{reqVO.billType}
+        </if>
+        <if test="reqVO.apStatus != null and reqVO.apStatus != ''">
+            AND ap.ap_status = #{reqVO.apStatus}
+        </if>
+        <choose>
+            <when test="reqVO.paymentStatus != null and reqVO.paymentStatus == 0">
+                AND IFNULL(ap.paid_amount, 0) = 0
+            </when>
+            <when test="reqVO.paymentStatus != null and reqVO.paymentStatus == 1">
+                AND IFNULL(ap.paid_amount, 0) > 0 AND IFNULL(ap.paid_amount, 0) &lt; ap.ap_amount
+            </when>
+            <when test="reqVO.paymentStatus != null and reqVO.paymentStatus == 2">
+                AND IFNULL(ap.paid_amount, 0) &gt;= ap.ap_amount
+            </when>
+        </choose>
+        <if test="reqVO.billDateStart != null">
+            AND ap.bill_date &gt;= #{reqVO.billDateStart}
+        </if>
+        <if test="reqVO.billDateEnd != null">
+            AND ap.bill_date &lt;= #{reqVO.billDateEnd}
+        </if>
+        <if test="reqVO.dueDateStart != null">
+            AND ap.due_date &gt;= #{reqVO.dueDateStart}
+        </if>
+        <if test="reqVO.dueDateEnd != null">
+            AND ap.due_date &lt;= #{reqVO.dueDateEnd}
+        </if>
+        ORDER BY ap.bill_date DESC, ap.id DESC
+    </select>
+
+    <select id="selectApById" resultMap="WmsAccountsPayableRespVOResult">
+        SELECT
+            ap.id,
+            ap.supplier_id,
+            s.supplier_name,
+            ap.customer_id,
+            c.customer_name,
+            ap.bill_type,
+            CASE ap.bill_type
+                WHEN '1' THEN '采购订单'
+                WHEN '2' THEN '采购入库'
+                WHEN '3' THEN '销售退货'
+                ELSE '未知'
+            END AS bill_type_name,
+            ap.bill_no,
+            ap.bill_id,
+            ap.bill_amount,
+            IFNULL(ap.paid_amount, 0) AS paid_amount,
+            ap.ap_amount,
+            ap.ap_status,
+            CASE ap.ap_status
+                WHEN '0' THEN '未结清'
+                WHEN '1' THEN '已结清'
+                ELSE '未知'
+            END AS ap_status_name,
+            ap.bill_date,
+            ap.due_date
+        FROM wms_accounts_payable ap
+        LEFT JOIN wms_supplier s ON ap.supplier_id = s.id
+        LEFT JOIN wms_customer c ON ap.customer_id = c.id
+        WHERE ap.id = #{id}
+    </select>
+
+</mapper>

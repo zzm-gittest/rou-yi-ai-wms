@@ -1,0 +1,372 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.SysTenantMapper">
+
+	<resultMap type="SysTenant" id="SysTenantResult">
+		<id     property="tenantId"       column="tenant_id"       />
+		<result property="tenantName"     column="tenant_name"     />
+		<result property="contactUser"    column="contact_user"    />
+		<result property="contactPhone"   column="contact_phone"   />
+		<result property="accountCount"   column="account_count"   />
+		<result property="expireTime"     column="expire_time"     />
+		<result property="status"         column="status"          />
+		<result property="delFlag"        column="del_flag"        />
+		<result property="createBy"       column="create_by"       />
+		<result property="createTime"     column="create_time"     />
+		<result property="updateBy"       column="update_by"       />
+		<result property="updateTime"     column="update_time"     />
+		<result property="remark"         column="remark"          />
+		<result property="edition"        column="edition"         />
+		<result property="aiEnabled"      column="ai_enabled"      />
+		<result property="voiceEnabled"   column="voice_enabled"   />
+		<result property="ocrEnabled"     column="ocr_enabled"     />
+		<result property="scanEnabled"    column="scan_enabled"    />
+		<result property="aiPoints"        column="ai_points"        />
+		<result property="aiPointsTotalCharged" column="ai_points_total_charged" />
+		<result property="aiPointsTotalUsed" column="ai_points_total_used" />
+		<result property="printCompanyName" column="print_company_name" />
+		<result property="printCompanyAddress" column="print_company_address" />
+		<result property="printCompanyPhone" column="print_company_phone" />
+		<result property="printLogoPath" column="print_logo_path" />
+		<result property="printFontScale" column="print_font_scale" />
+		<result property="printPageSize" column="print_page_size" />
+		<result property="aiApiKey" column="ai_api_key" />
+		<result property="aiModel" column="ai_model" />
+		<result property="aiApiUrl" column="ai_api_url" />
+		<result property="aiVisionModel" column="ai_vision_model" />
+		<result property="aiVoiceModel" column="ai_voice_model" />
+		<result property="monthlyQuotaText" column="monthly_quota_text" />
+		<result property="monthlyQuotaVoice" column="monthly_quota_voice" />
+		<result property="annualQuotaText" column="annual_quota_text" />
+		<result property="annualQuotaVoice" column="annual_quota_voice" />
+		<result property="usedCountText" column="used_count_text" />
+		<result property="usedCountVoice" column="used_count_voice" />
+		<result property="usedAnnualText" column="used_annual_text" />
+		<result property="usedAnnualVoice" column="used_annual_voice" />
+		<result property="quotaResetDate" column="quota_reset_date" />
+		<result property="quotaAnnualResetDate" column="quota_annual_reset_date" />
+		<result property="subscriptionType" column="subscription_type" />
+		<result property="subscriptionExpireTime" column="subscription_expire_time" />
+		<result property="appleOriginalTransactionId" column="apple_original_transaction_id" />
+		<result property="cancelRequested" column="cancel_requested" />
+		<result property="cancelRequestedAt" column="cancel_requested_at" />
+		<result property="cancelReason" column="cancel_reason" />
+	</resultMap>
+
+	<sql id="selectTenantVo">
+		select tenant_id, tenant_name, contact_user, contact_phone, account_count, expire_time, status, del_flag, create_by, create_time, update_by, update_time, remark, edition, ai_enabled, voice_enabled, ocr_enabled, scan_enabled, ai_points, ai_points_total_charged, ai_points_total_used, print_company_name, print_company_address, print_company_phone, print_logo_path, print_font_scale, print_page_size, ai_api_key, ai_model, ai_api_url, ai_vision_model, ai_voice_model, monthly_quota_text, monthly_quota_voice, annual_quota_text, annual_quota_voice, used_count_text, used_count_voice, used_annual_text, used_annual_voice, quota_reset_date, quota_annual_reset_date, subscription_type, subscription_expire_time, apple_original_transaction_id, cancel_requested, cancel_requested_at, cancel_reason
+		from sys_tenant
+    </sql>
+
+	<select id="selectTenantList" parameterType="SysTenant" resultMap="SysTenantResult">
+	    <include refid="selectTenantVo"/>
+		<where>
+			del_flag = '0'
+			<if test="tenantName != null and tenantName != ''">
+				AND tenant_name like concat('%', #{tenantName}, '%')
+			</if>
+			<if test="status != null and status != ''">
+				AND status = #{status}
+			</if>
+			<if test="contactUser != null and contactUser != ''">
+				AND contact_user like concat('%', #{contactUser}, '%')
+			</if>
+			<if test="contactPhone != null and contactPhone != ''">
+				AND contact_phone like concat('%', #{contactPhone}, '%')
+			</if>
+		</where>
+		order by tenant_id desc
+	</select>
+
+	<!-- 分页查询租户列表 -->
+	<select id="selectTenantListPage" resultMap="SysTenantResult">
+	    <include refid="selectTenantVo"/>
+		<where>
+			del_flag = '0'
+			<if test="tenant.tenantName != null and tenant.tenantName != ''">
+				AND tenant_name like concat('%', #{tenant.tenantName}, '%')
+			</if>
+			<if test="tenant.status != null and tenant.status != ''">
+				AND status = #{tenant.status}
+			</if>
+			<if test="tenant.contactUser != null and tenant.contactUser != ''">
+				AND contact_user like concat('%', #{tenant.contactUser}, '%')
+			</if>
+			<if test="tenant.contactPhone != null and tenant.contactPhone != ''">
+				AND contact_phone like concat('%', #{tenant.contactPhone}, '%')
+			</if>
+		</where>
+		order by tenant_id desc
+	</select>
+
+	<!-- 查询所有启用的租户 -->
+	<select id="selectTenantEnableList" resultMap="SysTenantResult">
+		<include refid="selectTenantVo"/>
+		<where>
+			del_flag = '0'
+			and status = '0'
+			and (expire_time is null or expire_time &gt; now())
+		</where>
+		order by tenant_id asc
+	</select>
+
+	<select id="selectTenantById" parameterType="Long" resultMap="SysTenantResult">
+		<include refid="selectTenantVo"/>
+		where tenant_id = #{tenantId} and del_flag = '0'
+	</select>
+
+	<select id="selectTenantPrintProfile" parameterType="Long" resultMap="SysTenantResult">
+		<include refid="selectTenantVo"/>
+		where tenant_id = #{tenantId} and del_flag = '0'
+	</select>
+
+	<select id="selectTenantByName" parameterType="String" resultMap="SysTenantResult">
+		<include refid="selectTenantVo"/>
+		where tenant_name = #{tenantName} and del_flag = '0' limit 1
+	</select>
+
+	<select id="checkTenantNameUnique" parameterType="String" resultMap="SysTenantResult">
+		<include refid="selectTenantVo"/>
+		where tenant_name = #{tenantName} and del_flag = '0' limit 1
+	</select>
+
+	<select id="selectMenuIdsByPerms" resultType="java.lang.Long">
+		select menu_id
+		from sys_menu
+		where perms like #{permsPattern}
+		  and menu_type in ('C', 'F')
+		  and status = '0'
+	</select>
+
+	<select id="selectParentMenuIdsByMenuIds" resultType="java.lang.Long">
+		select distinct parent_id
+		from sys_menu
+		where menu_id in
+		<foreach collection="menuIds" item="menuId" open="(" separator="," close=")">
+			#{menuId}
+		</foreach>
+		and parent_id is not null
+		and parent_id != 0
+	</select>
+
+	<update id="updateTenant" parameterType="SysTenant">
+ 		update sys_tenant
+ 		<set>
+ 			<if test="tenantName != null and tenantName != ''">tenant_name = #{tenantName},</if>
+ 			<if test="contactUser != null and contactUser != ''">contact_user = #{contactUser},</if>
+ 			<if test="contactPhone != null and contactPhone != ''">contact_phone = #{contactPhone},</if>
+ 			<if test="accountCount != null">account_count = #{accountCount},</if>
+ 			<if test="expireTime != null">expire_time = #{expireTime},</if>
+ 			<if test="status != null and status != ''">status = #{status},</if>
+ 			<if test="remark != null">remark = #{remark},</if>
+ 			<if test="edition != null and edition != ''">edition = #{edition},</if>
+ 			<if test="aiEnabled != null">ai_enabled = #{aiEnabled},</if>
+ 			<if test="voiceEnabled != null">voice_enabled = #{voiceEnabled},</if>
+ 			<if test="ocrEnabled != null">ocr_enabled = #{ocrEnabled},</if>
+ 			<if test="scanEnabled != null">scan_enabled = #{scanEnabled},</if>
+ 			<if test="monthlyQuotaText != null">monthly_quota_text = #{monthlyQuotaText},</if>
+ 			<if test="monthlyQuotaVoice != null">monthly_quota_voice = #{monthlyQuotaVoice},</if>
+ 			<if test="annualQuotaText != null">annual_quota_text = #{annualQuotaText},</if>
+ 			<if test="annualQuotaVoice != null">annual_quota_voice = #{annualQuotaVoice},</if>
+			<if test="cancelRequested != null">cancel_requested = #{cancelRequested},</if>
+			<if test="cancelRequestedAt != null">cancel_requested_at = #{cancelRequestedAt},</if>
+			<if test="cancelReason != null">cancel_reason = #{cancelReason},</if>
+ 			<if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+ 			update_time = sysdate()
+ 		</set>
+ 		where tenant_id = #{tenantId}
+	</update>
+
+	<update id="updateTenantPrintProfile" parameterType="SysTenant">
+		update sys_tenant
+		<set>
+			print_company_name = #{printCompanyName},
+			print_company_address = #{printCompanyAddress},
+			print_company_phone = #{printCompanyPhone},
+			print_logo_path = #{printLogoPath},
+			print_font_scale = #{printFontScale},
+			print_page_size = #{printPageSize},
+			ai_api_key = #{aiApiKey},
+			ai_model = #{aiModel},
+			ai_api_url = #{aiApiUrl},
+			ai_vision_model = #{aiVisionModel},
+			ai_voice_model = #{aiVoiceModel},
+			<if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+			update_time = sysdate()
+		</set>
+		where tenant_id = #{tenantId}
+		  and del_flag = '0'
+	</update>
+
+ 	<insert id="insertTenant" parameterType="SysTenant" useGeneratedKeys="true" keyProperty="tenantId">
+ 		insert into sys_tenant(
+ 			<if test="tenantId != null and tenantId != 0">tenant_id,</if>
+ 			<if test="tenantName != null and tenantName != ''">tenant_name,</if>
+ 			<if test="contactUser != null and contactUser != ''">contact_user,</if>
+ 			<if test="contactPhone != null and contactPhone != ''">contact_phone,</if>
+ 			<if test="accountCount != null">account_count,</if>
+ 			<if test="expireTime != null">expire_time,</if>
+ 			status,
+ 			<if test="remark != null and remark != ''">remark,</if>
+ 			<if test="edition != null and edition != ''">edition,</if>
+ 			<if test="aiEnabled != null">ai_enabled,</if>
+ 			<if test="voiceEnabled != null">voice_enabled,</if>
+ 			<if test="ocrEnabled != null">ocr_enabled,</if>
+ 			<if test="scanEnabled != null">scan_enabled,</if>
+			<if test="aiPoints != null">ai_points,</if>
+			<if test="aiPointsTotalCharged != null">ai_points_total_charged,</if>
+			<if test="aiPointsTotalUsed != null">ai_points_total_used,</if>
+ 			<if test="createBy != null and createBy != ''">create_by,</if>
+ 			create_time
+ 		)values(
+ 			<if test="tenantId != null and tenantId != 0">#{tenantId},</if>
+ 			<if test="tenantName != null and tenantName != ''">#{tenantName},</if>
+ 			<if test="contactUser != null and contactUser != ''">#{contactUser},</if>
+ 			<if test="contactPhone != null and contactPhone != ''">#{contactPhone},</if>
+ 			<if test="accountCount != null">#{accountCount},</if>
+ 			<if test="expireTime != null">#{expireTime},</if>
+ 			'0',
+ 			<if test="remark != null and remark != ''">#{remark},</if>
+ 			<if test="edition != null and edition != ''">#{edition},</if>
+ 			<if test="aiEnabled != null">#{aiEnabled},</if>
+ 			<if test="voiceEnabled != null">#{voiceEnabled},</if>
+ 			<if test="ocrEnabled != null">#{ocrEnabled},</if>
+ 			<if test="scanEnabled != null">#{scanEnabled},</if>
+			<if test="aiPoints != null">#{aiPoints},</if>
+			<if test="aiPointsTotalCharged != null">#{aiPointsTotalCharged},</if>
+			<if test="aiPointsTotalUsed != null">#{aiPointsTotalUsed},</if>
+ 			<if test="createBy != null and createBy != ''">#{createBy},</if>
+ 			sysdate()
+ 		)
+	</insert>
+
+	<delete id="deleteTenantById" parameterType="Long">
+		update sys_tenant set del_flag = '2' where tenant_id = #{tenantId}
+	</delete>
+
+	<delete id="deleteTenantByIds" parameterType="Long">
+ 		update sys_tenant set del_flag = '2' where tenant_id in
+ 		<foreach collection="array" item="tenantId" open="(" separator="," close=")">
+ 			#{tenantId}
+        </foreach>
+ 	</delete>
+
+	<!-- 原子预占文字解析配额（月度+年度双约束） -->
+	<update id="tryReserveTextQuota">
+		UPDATE sys_tenant
+		SET used_count_text = used_count_text + 1,
+		    used_annual_text = used_annual_text + 1
+		WHERE tenant_id = #{tenantId}
+		  AND ai_enabled = 1
+		  AND used_count_text &lt; monthly_quota_text
+		  AND used_annual_text &lt; annual_quota_text
+	</update>
+
+	<!-- 原子预占语音识别配额（月度+年度双约束） -->
+	<update id="tryReserveVoiceQuota">
+		UPDATE sys_tenant
+		SET used_count_voice = used_count_voice + 1,
+		    used_annual_voice = used_annual_voice + 1
+		WHERE tenant_id = #{tenantId}
+		  AND voice_enabled = 1
+		  AND used_count_voice &lt; monthly_quota_voice
+		  AND used_annual_voice &lt; annual_quota_voice
+	</update>
+
+	<!-- 回滚文字解析配额预占 -->
+	<update id="rollbackTextQuota">
+		UPDATE sys_tenant
+		SET used_count_text = GREATEST(used_count_text - 1, 0),
+		    used_annual_text = GREATEST(used_annual_text - 1, 0)
+		WHERE tenant_id = #{tenantId}
+	</update>
+
+	<!-- 回滚语音识别配额预占 -->
+	<update id="rollbackVoiceQuota">
+		UPDATE sys_tenant
+		SET used_count_voice = GREATEST(used_count_voice - 1, 0),
+		    used_annual_voice = GREATEST(used_annual_voice - 1, 0)
+		WHERE tenant_id = #{tenantId}
+	</update>
+
+	<!-- 月度配额重置（每月1号执行） -->
+	<update id="resetMonthlyQuota">
+		UPDATE sys_tenant
+		SET used_count_text = 0,
+		    used_count_voice = 0,
+		    used_count_ocr = 0,
+		    quota_reset_date = NOW()
+		WHERE del_flag = '0'
+	</update>
+
+	<!-- 年度配额重置（每年1月1号执行） -->
+	<update id="resetAnnualQuota">
+		UPDATE sys_tenant
+		SET used_annual_text = 0,
+		    used_annual_voice = 0,
+		    used_annual_ocr = 0,
+		    quota_annual_reset_date = NOW()
+		WHERE del_flag = '0'
+	</update>
+
+	<!-- ============ AI点数体系 ============ -->
+
+	<!-- 原子扣减AI点数 -->
+	<update id="tryConsumePoints">
+		UPDATE sys_tenant
+		SET ai_points = ai_points - #{cost},
+		    ai_points_total_used = ai_points_total_used + #{cost}
+		WHERE tenant_id = #{tenantId}
+		  AND ai_enabled = 1
+		  AND ai_points &gt;= #{cost}
+	</update>
+
+	<!-- 退还AI点数 -->
+	<update id="refundPoints">
+		UPDATE sys_tenant
+		SET ai_points = ai_points + #{amount},
+		    ai_points_total_used = GREATEST(ai_points_total_used - #{amount}, 0)
+		WHERE tenant_id = #{tenantId}
+	</update>
+
+	<!-- 充值AI点数 -->
+	<update id="chargePoints">
+		UPDATE sys_tenant
+		SET ai_points = ai_points + #{amount},
+		    ai_points_total_charged = ai_points_total_charged + #{amount}
+		WHERE tenant_id = #{tenantId}
+		  AND del_flag = '0'
+	</update>
+
+	<!-- 更新订阅信息 -->
+	<update id="updateSubscription">
+		UPDATE sys_tenant
+		SET subscription_type = #{subscriptionType},
+		    subscription_expire_time = #{subscriptionExpireTime},
+		    expire_time = #{subscriptionExpireTime},
+		    edition = CASE
+		        WHEN #{subscriptionType} = 'yearly' THEN 'pro'
+		        WHEN #{subscriptionType} = 'monthly' THEN 'basic'
+		        ELSE edition
+		    END,
+		    ai_enabled = 1,
+		    voice_enabled = 1,
+		    ocr_enabled = 1,
+		    scan_enabled = 1,
+		    apple_original_transaction_id = #{appleOriginalTransactionId},
+		    update_time = sysdate()
+		WHERE tenant_id = #{tenantId}
+		  AND del_flag = '0'
+	</update>
+
+	<!-- 根据Apple原始交易ID查找租户 -->
+	<select id="selectTenantByAppleOriginalTxId" resultMap="SysTenantResult">
+		<include refid="selectTenantVo"/>
+		WHERE apple_original_transaction_id = #{originalTransactionId}
+		  AND del_flag = '0'
+		LIMIT 1
+	</select>
+
+</mapper>

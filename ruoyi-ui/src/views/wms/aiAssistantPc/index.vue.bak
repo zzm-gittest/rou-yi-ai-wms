@@ -1,0 +1,2726 @@
+<template>
+  <div class="app-container ai-pc-page">
+    <div class="ai-shell">
+      <aside class="sidebar">
+        <button class="new-chat-btn" :disabled="sending" @click="startNewConversation">+ 新建对话</button>
+        <div class="session-list">
+          <div v-for="group in groupedConversations" :key="group.key" class="session-group">
+            <div class="group-title">{{ group.label }}</div>
+            <button
+              v-for="item in group.items"
+              :key="item.conversationId"
+              :class="['session-item', { active: item.conversationId === activeConversationId }]"
+              @click="activateConversation(item.conversationId)"
+            >
+              <div class="session-main">
+                <div class="session-title">{{ item.title }}</div>
+                <div class="session-summary">{{ item.summary || '暂无摘要' }}</div>
+              </div>
+              <div class="session-meta">{{ formatRelativeTime(item.updatedAt) }}</div>
+            </button>
+          </div>
+          <div v-if="!conversations.length" class="empty-history">还没有历史对话，先新建一条。</div>
+        </div>
+      </aside>
+
+      <section class="chat-panel">
+        <header class="chat-header">
+          <div>
+            <div class="chat-title">{{ currentTitle }}</div>
+            <div class="chat-subtitle">{{ currentSubtitle }}</div>
+          </div>
+          <div class="header-tags">
+            <span class="header-tag">8类单据PC助手</span>
+            <span class="header-tag">本地 NLU 优先</span>
+          </div>
+        </header>
+
+        <div class="message-wrap">
+          <div class="chat-list" ref="chatList" @scroll="handleChatScroll">
+            <div v-for="(msg, idx) in messages" :key="idx" :class="['msg-row', msg.role]">
+              <div :class="['avatar', msg.role]">
+                <img v-if="msg.role === 'user'" :src="avatar" alt="用户头像" class="avatar-image">
+                <img v-else :src="aiLogo" alt="智存AI" class="avatar-image">
+              </div>
+              <div :class="['bubble', { wide: msg.card && ['DIFF_PREVIEW', 'EXEC_RESULT', 'GOODS_SKU_FORM'].includes(msg.card.type) }]">
+                <div class="text">{{ msg.text }}</div>
+
+                <div v-if="msg.card && msg.card.type === 'ACTION_LIST'" class="card-block">
+                  <div class="card-title">可直接发起的操作</div>
+                  <div class="chip-list">
+                    <button
+                      v-for="(action, aIdx) in msg.card.actions || []"
+                      :key="'action-' + aIdx"
+                      class="message-chip"
+                      :disabled="isHistoryMessage(idx) || sending"
+                      @click="send(action.value || action.name, action.name)"
+                    >{{ action.name }}</button>
+                  </div>
+                </div>
+
+                <div v-if="msg.card && msg.card.type === 'TEMPLATE'" class="card-block">
+                  <div class="card-title">{{ msg.card.title }}</div>
+                  <div
+                    v-for="(tpl, tIdx) in msg.card.templates || []"
+                    :key="'tpl-' + tIdx"
+                    class="template-item"
+                    :class="{ disabled: isHistoryMessage(idx) || sending }"
+                  >
+                    <button
+                      class="template-main"
+                      :disabled="isHistoryMessage(idx) || sending"
+                      @click="applyTemplateDraft(tpl)"
+                    >{{ templateLabel(tpl) }}</button>
+                    <el-button
+                      class="template-copy-btn"
+                      type="text"
+                      icon="el-icon-document-copy"
+                      :disabled="isHistoryMessage(idx) || sending"
+                      @click.stop="copyTemplateText(tpl)"
+                    >复制</el-button>
+                  </div>
+                </div>
+
+                <div v-else-if="msg.card && msg.card.type === 'CANDIDATE'" class="card-block">
+                  <div class="card-title">{{ msg.card.title }}</div>
+                  <div v-if="msg.card.selectionMode === 'single-list' || msg.card.selectionMode === 'multi-list'" class="candidate-panel">
+                    <div class="candidate-panel-meta">
+                      <span>共 {{ candidateDisplayOptions(msg.card).length }} / {{ msg.card.totalCount || 0 }} 条</span>
+                      <span v-if="(msg.card.totalPages || 1) > 1">第 {{ msg.card.page || 1 }} / {{ msg.card.totalPages || 1 }} 页</span>
+                      <span v-if="(msg.card.totalPages || 1) > 1" class="candidate-page-hint">{{ buildCandidatePager(msg.card) }}</span>
+                      <span v-if="isMultiCandidateCard(msg.card)">已临时勾选 {{ candidateSelectedCount(msg.card) }} 条</span>
+                    </div>
+                    <el-input
+                      v-if="msg.card.allowSearch"
+                      v-model="msg.card.searchKeyword"
+                      size="mini"
+                      clearable
+                      :placeholder="msg.card.remoteSearch ? '输入单据号或供应商名称搜索' : '输入单据号或供应商名称过滤'"
+                      class="candidate-search"
+                      @input="handleCandidateSearchInput(msg)"
+                    />
+                    <el-checkbox-group
+                      v-if="isMultiCandidateCard(msg.card)"
+                      v-model="msg.card.selectedSkuIds"
+                      class="candidate-check-group"
+                      @change="handleCandidateSelectionChange(msg.card)"
+                    >
+                      <label
+                        v-for="(opt, oIdx) in candidateDisplayOptions(msg.card)"
+                        :key="'candidate-' + oIdx"
+                        :class="['candidate-item', 'selectable', { disabled: isHistoryMessage(idx) || sending }]"
+                      >
+                        <el-checkbox :label="candidateOptionId(opt)" :disabled="isHistoryMessage(idx) || sending">
+                          <span class="candidate-index">{{ candidateIndex(msg.card, oIdx) }}</span>
+                          <span class="candidate-label">{{ candidateOptionLabel(opt) }}</span>
+                        </el-checkbox>
+                        <el-button
+                          v-if="canViewCandidateDetail(msg.card, opt)"
+                          type="text"
+                          size="mini"
+                          class="candidate-detail-btn"
+                          :disabled="isHistoryMessage(idx) || sending"
+                          @click.stop="openCandidateDetail(msg.card, opt)"
+                        >详情</el-button>
+                      </label>
+                    </el-checkbox-group>
+                    <el-radio-group v-else v-model="msg.card.selectedValue" class="candidate-radio-group">
+                      <label
+                        v-for="(opt, oIdx) in candidateDisplayOptions(msg.card)"
+                        :key="'candidate-' + oIdx"
+                        :class="['candidate-item', 'selectable', { disabled: isHistoryMessage(idx) || sending }]"
+                      >
+                        <el-radio :label="opt.value" :disabled="isHistoryMessage(idx) || sending">
+                          <span class="candidate-index">{{ candidateIndex(msg.card, oIdx) }}</span>
+                          <span class="candidate-label">{{ candidateOptionLabel(opt) }}</span>
+                        </el-radio>
+                        <el-button
+                          v-if="canViewCandidateDetail(msg.card, opt)"
+                          type="text"
+                          size="mini"
+                          class="candidate-detail-btn"
+                          :disabled="isHistoryMessage(idx) || sending"
+                          @click.stop="openCandidateDetail(msg.card, opt)"
+                        >详情</el-button>
+                      </label>
+                    </el-radio-group>
+                    <div class="candidate-toolbar">
+                      <el-button
+                        v-if="isMultiCandidateCard(msg.card)"
+                        size="mini"
+                        plain
+                        :disabled="isHistoryMessage(idx) || sending || !hasCurrentPageCandidate(msg.card)"
+                        @click="selectAllCurrentPage(msg)"
+                      >当前页全选</el-button>
+                      <el-button
+                        v-if="isMultiCandidateCard(msg.card)"
+                        size="mini"
+                        plain
+                        :disabled="isHistoryMessage(idx) || sending || !hasCurrentPageSelected(msg.card)"
+                        @click="clearCurrentPageSelection(msg)"
+                      >清空当前页</el-button>
+                      <el-button
+                        v-if="isMultiCandidateCard(msg.card)"
+                        size="mini"
+                        plain
+                        :disabled="isHistoryMessage(idx) || sending || !candidateSelectedCount(msg.card)"
+                        @click="clearAllCandidateSelection(msg)"
+                      >清空已选</el-button>
+                      <el-button v-if="msg.card.hasPrev || msg.card.hasNext" size="mini" plain :disabled="isHistoryMessage(idx) || sending || !msg.card.hasPrev" @click="sendCandidatePaging('上一页')">上一页</el-button>
+                      <el-button v-if="msg.card.hasPrev || msg.card.hasNext" size="mini" plain :disabled="isHistoryMessage(idx) || sending || !msg.card.hasNext" @click="sendCandidatePaging('下一页')">下一页</el-button>
+                      <el-button
+                        v-if="msg.card.otherOption"
+                        size="mini"
+                        plain
+                        :disabled="isHistoryMessage(idx) || sending"
+                        @click="send(msg.card.otherOption.value, msg.card.otherOption.label)"
+                      >{{ msg.card.otherOption.label }}</el-button>
+                      <el-button
+                        type="primary"
+                        size="mini"
+                        :disabled="isHistoryMessage(idx) || sending || !canConfirmCandidate(msg.card)"
+                        @click="confirmCandidateSelection(msg)"
+                      >确定</el-button>
+                    </div>
+                  </div>
+                  <div v-else>
+                    <div v-if="msg.card.options && msg.card.options.length" class="candidate-list">
+                      <div v-for="(opt, oIdx) in msg.card.options || []" :key="'candidate-' + oIdx" class="candidate-item">
+                        <span class="candidate-index">{{ oIdx + 1 }}</span>
+                        <span class="candidate-label">{{ candidateOptionLabel(opt) }}</span>
+                      </div>
+                    </div>
+                    <div class="chip-list candidate-actions">
+                      <button
+                        v-for="(opt, oIdx) in msg.card.options || []"
+                        :key="'opt-' + oIdx"
+                        class="message-chip"
+                        :disabled="isHistoryMessage(idx) || sending"
+                        @click="send(opt.value || opt.label, opt.label)"
+                      >{{ opt.label }}</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-else-if="msg.card && msg.card.type === 'GOODS_CREATE_FORM'" class="card-block form-card goods-flow-card">
+                  <div class="card-title">{{ msg.card.title }}</div>
+                  <el-form label-position="top" size="mini">
+                    <el-form-item label="商品名称 *">
+                      <el-input v-model="msg.card.formModel.goodsName" placeholder="请输入商品名称" :disabled="isHistoryMessage(idx) || sending" />
+                    </el-form-item>
+                    <el-form-item label="单位">
+                      <div class="inline-select-action">
+                        <el-select
+                          v-model="msg.card.formModel.unitName"
+                          filterable
+                          clearable
+                          placeholder="请选择单位"
+                          style="width: 100%"
+                          :disabled="isHistoryMessage(idx) || sending"
+                        >
+                          <el-option
+                            v-for="unit in unitOptions"
+                            :key="'unit-' + unit.id"
+                            :label="unit.unitName"
+                            :value="unit.unitName"
+                          />
+                        </el-select>
+                        <el-button size="mini" plain :disabled="isHistoryMessage(idx) || sending" @click="addInlineUnit(msg)">新增</el-button>
+                      </div>
+                    </el-form-item>
+                    <el-form-item label="分类 *">
+                      <div class="inline-select-action">
+                        <el-select
+                          v-model="msg.card.formModel.categoryId"
+                          filterable
+                          clearable
+                          placeholder="请选择分类"
+                          style="width: 100%"
+                          :disabled="isHistoryMessage(idx) || sending"
+                          @change="handleGoodsCategoryChange(msg, $event)"
+                        >
+                          <el-option
+                            v-for="category in categoryOptions"
+                            :key="'category-' + category.id"
+                            :label="category.categoryName"
+                            :value="category.id"
+                          />
+                        </el-select>
+                        <el-button size="mini" plain :disabled="isHistoryMessage(idx) || sending" @click="addInlineCategory(msg)">新增</el-button>
+                      </div>
+                    </el-form-item>
+                    <div class="form-actions">
+                      <el-button size="mini" type="primary" :disabled="isHistoryMessage(idx) || sending" @click="submitForm(msg, 'SAVE_NO_SPEC', { displayText: '保存无规格商品' })">保存</el-button>
+                      <el-button size="mini" plain :disabled="isHistoryMessage(idx) || sending" @click="submitForm(msg, 'GO_MULTI_SPEC', { displayText: '进入多规格设置' })">多规格设置</el-button>
+                    </div>
+                  </el-form>
+                </div>
+
+                <div v-else-if="msg.card && msg.card.type === 'GOODS_SPEC_FORM'" class="card-block form-card goods-flow-card">
+                  <div class="card-title">{{ msg.card.title }}</div>
+                  <div class="goods-flow-meta">商品：{{ msg.card.formModel.goodsName || '-' }} / 单位：{{ msg.card.formModel.unitName || '个' }}</div>
+                  <div class="spec-editor">
+                    <div v-for="(spec, specIndex) in msg.card.formModel.specs" :key="'spec-' + specIndex" class="spec-editor-item">
+                      <div class="spec-editor-head">
+                        <el-input v-model="spec.specName" placeholder="规格名称，如：颜色、尺寸" size="mini" :disabled="isHistoryMessage(idx) || sending" />
+                        <el-button type="text" :disabled="isHistoryMessage(idx) || sending" @click="removeSpecRow(msg, specIndex)">删除规格</el-button>
+                      </div>
+                      <div v-for="(value, valueIndex) in spec.values" :key="'spec-value-' + specIndex + '-' + valueIndex" class="spec-value-row">
+                        <el-input v-model="value.specValue" placeholder="规格值，如：红色、L" size="mini" :disabled="isHistoryMessage(idx) || sending" />
+                        <el-button type="text" :disabled="isHistoryMessage(idx) || sending" @click="removeSpecValue(msg, specIndex, valueIndex)">删除</el-button>
+                      </div>
+                      <el-button size="mini" plain icon="el-icon-plus" :disabled="isHistoryMessage(idx) || sending" @click="addSpecValue(msg, specIndex)">添加规格值</el-button>
+                    </div>
+                    <el-button size="mini" type="primary" plain icon="el-icon-plus" :disabled="isHistoryMessage(idx) || sending" @click="addSpecRow(msg)">新增规格</el-button>
+                  </div>
+                  <div class="form-actions">
+                    <el-button size="mini" type="primary" :disabled="isHistoryMessage(idx) || sending" @click="submitForm(msg, 'GO_SKU_LIST', { displayText: '生成SKU列表' })">下一步</el-button>
+                    <el-button
+                      size="mini"
+                      plain
+                      :disabled="isHistoryMessage(idx) || sending"
+                      @click="submitForm(msg, 'BACK_TO_NO_SPEC', { confirmMessage: '当前多规格未保存，返回将按无规格商品保存，是否继续？', displayText: '返回并按无规格保存' })"
+                    >返回</el-button>
+                  </div>
+                </div>
+
+                <div v-else-if="msg.card && msg.card.type === 'GOODS_SKU_FORM'" class="card-block form-card goods-flow-card">
+                  <div class="card-title">{{ msg.card.title }}</div>
+                  <div class="goods-flow-meta">商品：{{ msg.card.formModel.goodsName || '-' }} / 单位：{{ msg.card.formModel.unitName || '个' }}</div>
+                  <el-table :data="msg.card.formModel.skuList || []" size="mini" border class="sku-chat-table">
+                    <el-table-column label="规格组合" min-width="180">
+                      <template slot-scope="scope">
+                        <span>{{ formatSpecDisplay(scope.row.specInfo) }}</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="SKU名称" min-width="180">
+                      <template slot-scope="scope">
+                        <el-input v-model="scope.row.skuName" size="mini" placeholder="请输入SKU名称" :disabled="isHistoryMessage(idx) || sending" />
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="单位" width="90">
+                      <template slot-scope="scope">
+                        <span>{{ scope.row.unitName || msg.card.formModel.unitName || '个' }}</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="数量" width="120">
+                      <template slot-scope="scope">
+                        <el-input
+                          :value="scope.row.quantity"
+                          size="mini"
+                          placeholder="0"
+                          inputmode="decimal"
+                          :disabled="isHistoryMessage(idx) || sending"
+                          @input="handleSkuNumberInput(scope.row, 'quantity', $event)"
+                        />
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="采购单价" width="140">
+                      <template slot-scope="scope">
+                        <el-input
+                          :value="scope.row.price"
+                          size="mini"
+                          placeholder="0.00"
+                          inputmode="decimal"
+                          :disabled="isHistoryMessage(idx) || sending"
+                          @input="handleSkuNumberInput(scope.row, 'price', $event)"
+                        />
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="操作" width="80">
+                      <template slot-scope="scope">
+                        <el-button type="text" size="mini" :disabled="isHistoryMessage(idx) || sending" @click="removeSkuRow(msg, scope.$index)">删除</el-button>
+                      </template>
+                    </el-table-column>
+                  </el-table>
+                  <div class="form-actions">
+                    <el-button size="mini" type="primary" :disabled="isHistoryMessage(idx) || sending" @click="submitForm(msg, 'SAVE_MULTI_SPEC', { displayText: '保存多规格商品' })">保存</el-button>
+                    <el-button
+                      size="mini"
+                      plain
+                      :disabled="isHistoryMessage(idx) || sending"
+                      @click="submitForm(msg, 'BACK_TO_NO_SPEC', { confirmMessage: '当前多规格未保存，返回将按无规格商品保存，是否继续？', displayText: '返回并按无规格保存' })"
+                    >返回</el-button>
+                  </div>
+                </div>
+
+                <div v-else-if="msg.card && msg.card.type === 'REQUIRED_FORM'" class="card-block form-card">
+                  <div class="card-title">{{ msg.card.title }}</div>
+                  <el-form label-position="top" size="mini">
+                    <el-form-item
+                      v-for="(field, fIdx) in msg.card.fields || []"
+                      :key="'field-' + fIdx"
+                      :label="field.label + (field.required ? ' *' : '')"
+                    >
+                      <div v-if="field.component === 'readonly'" class="readonly-field">{{ msg.card.formModel[field.key] || '-' }}</div>
+                      <el-select
+                        v-else-if="field.component === 'select'"
+                        v-model="msg.card.formModel[field.key]"
+                        filterable
+                        clearable
+                        :placeholder="field.placeholder || ('请选择' + field.label)"
+                        style="width: 100%"
+                      >
+                        <el-option
+                          v-for="option in getFormFieldOptions(field)"
+                          :key="field.key + '-' + option.value"
+                          :label="option.label"
+                          :value="option.value"
+                        />
+                      </el-select>
+                      <el-date-picker
+                        v-else-if="field.component === 'date'"
+                        v-model="msg.card.formModel[field.key]"
+                        type="date"
+                        value-format="yyyy-MM-dd"
+                        :placeholder="field.placeholder || '请选择日期'"
+                        style="width: 100%"
+                      />
+                      <el-input
+                        v-else
+                        v-model="msg.card.formModel[field.key]"
+                        :placeholder="field.placeholder || ''"
+                        :type="field.key === 'items' ? 'textarea' : 'text'"
+                        :rows="field.key === 'items' ? 3 : undefined"
+                        resize="none"
+                      />
+                    </el-form-item>
+                    <div class="form-actions">
+                      <el-button size="mini" type="primary" @click="submitForm(msg)">{{ msg.card.submitLabel || '提交' }}</el-button>
+                      <el-button v-if="msg.card.cancelAction" size="mini" plain @click="send(msg.card.cancelAction, msg.card.cancelLabel || '取消')">{{ msg.card.cancelLabel || '取消' }}</el-button>
+                    </div>
+                  </el-form>
+                </div>
+
+                <div v-if="msg.card && msg.card.type === 'TABLE'" class="card-block table-card">
+                  <div class="card-title">{{ msg.card.title }}</div>
+                  <el-table :data="msg.card.rows" size="mini" border>
+                    <el-table-column prop="orderNo" label="订单号" min-width="150" />
+                    <el-table-column prop="supplierName" label="供应商" min-width="120" />
+                    <el-table-column prop="orderStatus" label="状态" width="90" />
+                    <el-table-column prop="totalAmount" label="金额" width="120">
+                      <template slot-scope="scope">
+                        <span>{{ formatCurrency(scope.row.totalAmount) }}</span>
+                      </template>
+                    </el-table-column>
+                  </el-table>
+                </div>
+
+                <div v-else-if="msg.card && msg.card.type === 'DIFF_PREVIEW'" class="card-block preview-card">
+                  <div class="card-title">{{ msg.card.title }}</div>
+                  <div class="preview-meta">
+                    <span v-if="msg.card.supplier">供应商：{{ msg.card.supplier }}</span>
+                    <span v-if="msg.card.customer">客户：{{ msg.card.customer }}</span>
+                    <span v-if="msg.card.warehouse">仓库：{{ msg.card.warehouse }}</span>
+                    <span v-if="msg.card.outWarehouse">调出仓：{{ msg.card.outWarehouse }}</span>
+                    <span v-if="msg.card.inWarehouse">调入仓：{{ msg.card.inWarehouse }}</span>
+                    <span v-if="msg.card.checkType">盘点类型：{{ formatCheckType(msg.card.checkType) }}</span>
+                    <span v-if="msg.card.linkOrderNo">来源单号：{{ msg.card.linkOrderNo }}</span>
+                  </div>
+                  <div v-if="msg.card.editable" class="preview-edit-tip">{{ previewTipText(msg.card) }}</div>
+                  <div v-if="msg.card.editable && msg.card.allowSupplierEdit" class="preview-inline-form">
+                    <div class="inline-select-action">
+                      <el-select
+                        v-model="msg.card.formModel.supplierId"
+                        filterable
+                        clearable
+                        placeholder="请选择供应商"
+                        style="width: 100%"
+                        :disabled="isHistoryMessage(idx) || sending"
+                      >
+                        <el-option
+                          v-for="item in supplierOptions"
+                          :key="'preview-supplier-' + item.id"
+                          :label="item.supplierName"
+                          :value="item.id"
+                        />
+                      </el-select>
+                      <el-button
+                        size="mini"
+                        plain
+                        :disabled="isHistoryMessage(idx) || sending"
+                        @click="addInlinePreviewSupplier(msg)"
+                      >新增供应商</el-button>
+                    </div>
+                  </div>
+                  <div v-if="msg.card.editable && msg.card.allowWarehouseEdit" class="preview-inline-form preview-inline-form-warehouse">
+                    <div class="inline-select-action">
+                      <el-select
+                        v-model="msg.card.formModel.warehouseId"
+                        filterable
+                        clearable
+                        placeholder="请选择仓库"
+                        style="width: 100%"
+                        :disabled="isHistoryMessage(idx) || sending"
+                      >
+                        <el-option
+                          v-for="item in warehouseOptions"
+                          :key="'preview-warehouse-' + item.id"
+                          :label="item.warehouseName"
+                          :value="item.id"
+                        />
+                      </el-select>
+                      <el-button
+                        size="mini"
+                        plain
+                        :disabled="isHistoryMessage(idx) || sending"
+                        @click="addInlinePreviewWarehouse(msg)"
+                      >新增仓库</el-button>
+                    </div>
+                  </div>
+                  <div v-if="msg.card.editable && msg.card.allowCustomerEdit" class="preview-inline-form preview-inline-form-customer">
+                    <div class="inline-select-action">
+                      <el-select
+                        v-model="msg.card.formModel.customerId"
+                        filterable
+                        clearable
+                        placeholder="请选择客户"
+                        style="width: 100%"
+                        :disabled="isHistoryMessage(idx) || sending"
+                      >
+                        <el-option
+                          v-for="item in customerOptions"
+                          :key="'preview-customer-' + item.id"
+                          :label="item.customerName"
+                          :value="item.id"
+                        />
+                      </el-select>
+                      <el-button
+                        size="mini"
+                        plain
+                        :disabled="isHistoryMessage(idx) || sending"
+                        @click="addInlinePreviewCustomer(msg)"
+                      >新增客户</el-button>
+                    </div>
+                  </div>
+                  <el-table :data="msg.card.editable ? ((msg.card.formModel && msg.card.formModel.items) || []) : (msg.card.items || [])" size="mini" border>
+                    <el-table-column prop="goods" label="商品" min-width="120" />
+                    <el-table-column prop="sku" label="规格" min-width="120" />
+                    <el-table-column prop="unit" label="单位" width="120">
+                      <template slot-scope="scope">
+                        <el-select
+                          v-if="msg.card.editable && ['PURCHASE_ORDER', 'PO'].includes(msg.card.domainType)"
+                          v-model="scope.row.unit"
+                          filterable
+                          allow-create
+                          default-first-option
+                          clearable
+                          placeholder="单位可选"
+                          size="mini"
+                          :disabled="isHistoryMessage(idx) || sending"
+                        >
+                          <el-option
+                            v-for="unit in unitOptions"
+                            :key="'preview-unit-' + unit.id"
+                            :label="unit.unitName"
+                            :value="unit.unitName"
+                          />
+                        </el-select>
+                        <span v-else>{{ scope.row.unit || '-' }}</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column v-if="msg.card.domainType === 'PURCHASE_IN' && msg.card.linkedMode" prop="orderQuantity" label="订单数量" width="100">
+                      <template slot-scope="scope">
+                        <span>{{ scope.row.orderQuantity || 0 }}</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column v-if="msg.card.domainType === 'PURCHASE_IN' && msg.card.linkedMode" prop="receivedQty" label="已入库数量" width="100">
+                      <template slot-scope="scope">
+                        <span>{{ scope.row.receivedQty || 0 }}</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column v-if="msg.card.domainType === 'PURCHASE_IN' && msg.card.linkedMode" prop="maxQty" label="剩余最大入库数量" width="130">
+                      <template slot-scope="scope">
+                        <span>{{ scope.row.maxQty || 0 }}</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="quantity" :label="msg.card.domainType === 'STOCK_CHECK' ? '实际数量' : '数量'" width="120">
+                      <template slot-scope="scope">
+                        <el-input
+                          v-if="msg.card.editable"
+                          :value="scope.row.quantity"
+                          size="mini"
+                          placeholder="0"
+                          inputmode="decimal"
+                          :disabled="isHistoryMessage(idx) || sending"
+                          @input="handlePreviewNumberInput(scope.row, 'quantity', $event)"
+                        />
+                        <span v-else>{{ scope.row.quantity }}</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column v-if="msg.card.domainType === 'STOCK_CHECK'" prop="beforeQty" label="账面数" width="100" />
+                    <el-table-column v-if="msg.card.editable && msg.card.linkedMode && msg.card.domainType !== 'STOCK_CHECK' && !['PURCHASE_ORDER', 'PO', 'PURCHASE_IN', 'PI'].includes(msg.card.domainType)" prop="maxQty" :label="msg.card.domainType === 'PURCHASE_RETURN' ? '可退货数量' : '可用上限'" width="110" />
+                    <el-table-column v-if="!['STOCK_CHECK', 'STOCK_TRANSFER'].includes(msg.card.domainType)" prop="price" label="单价" width="110">
+                      <template slot-scope="scope">
+                        <el-input
+                          v-if="msg.card.editable && msg.card.allowPriceEdit"
+                          :value="scope.row.price"
+                          size="mini"
+                          placeholder="0.00"
+                          inputmode="decimal"
+                          :disabled="isHistoryMessage(idx) || sending"
+                          @input="handlePreviewNumberInput(scope.row, 'price', $event)"
+                        />
+                        <span v-else>{{ formatCurrency(scope.row.price) }}</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column v-if="!['STOCK_CHECK', 'STOCK_TRANSFER'].includes(msg.card.domainType)" prop="amount" label="金额" width="120">
+                      <template slot-scope="scope">
+                        <span>{{ formatCurrency(previewRowAmount(scope.row)) }}</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column v-if="msg.card.editable" label="操作" width="80">
+                      <template slot-scope="scope">
+                        <el-button type="text" size="mini" :disabled="isHistoryMessage(idx) || sending" @click="removePreviewRow(msg, scope.$index)">删除</el-button>
+                      </template>
+                    </el-table-column>
+                  </el-table>
+                  <div v-if="msg.card.editable" class="form-actions">
+                    <el-button size="mini" type="primary" :disabled="isHistoryMessage(idx) || sending" @click="confirmPreviewAndCreate(msg)">确认</el-button>
+                    <el-button size="mini" plain :disabled="isHistoryMessage(idx) || sending" @click="cancelPreviewCreate(msg)">取消</el-button>
+                    <el-button v-if="msg.card.nextAction" size="mini" plain :disabled="isHistoryMessage(idx) || sending" @click="submitPreviewAndContinue(msg)">{{ msg.card.nextLabel || '下一步' }}</el-button>
+                  </div>
+                </div>
+
+                <div v-else-if="msg.card && msg.card.type === 'EXEC_RESULT'" class="card-block result-card">
+                  <div class="result-head">
+                    <div class="card-title">执行结果</div>
+                    <div v-if="supportsResultActions(msg.card)" class="result-actions">
+                      <el-button size="mini" plain :disabled="isHistoryMessage(idx) || !canEditResult(msg.card)" @click="openOrderEditor(msg)">修改</el-button>
+                      <el-button size="mini" plain :disabled="isHistoryMessage(idx) || !canApproveResult(msg.card)" @click="approveResultOrder(msg)">审核</el-button>
+                      <el-button size="mini" plain :disabled="isHistoryMessage(idx) || !canPrintResult(msg.card)" @click="printResultOrder(msg.card)">打印</el-button>
+                      <el-button size="mini" plain :disabled="isHistoryMessage(idx) || !canDeleteResult(msg.card)" @click="deleteResultOrder(msg)">删除</el-button>
+                    </div>
+                  </div>
+                  <div class="result-grid">
+                    <div>类型：{{ formatDomainType(msg.card.domainType) }}</div>
+                    <div v-if="msg.card.orderNo">单号：{{ msg.card.orderNo }}</div>
+                    <div v-if="msg.card.supplierName">供应商：{{ msg.card.supplierName }}</div>
+                    <div v-if="msg.card.customerName">客户：{{ msg.card.customerName }}</div>
+                    <div v-if="msg.card.partner">对象：{{ msg.card.partner }}</div>
+                    <div v-if="msg.card.warehouse">仓库：{{ msg.card.warehouse }}</div>
+                    <div v-if="msg.card.checkType">盘点类型：{{ formatCheckType(msg.card.checkType) }}</div>
+                    <div v-if="msg.card.sourceNo">来源单号：{{ msg.card.sourceNo }}</div>
+                    <div v-if="msg.card.orderDate">下单日期：{{ msg.card.orderDate }}</div>
+                    <div v-if="msg.card.totalAmount !== undefined">总金额：{{ formatCurrency(msg.card.totalAmount) }}</div>
+                    <div v-if="msg.card.billNo">单号：{{ msg.card.billNo }}</div>
+                    <div v-if="msg.card.orderStatus !== undefined">状态：{{ formatOrderStatus(msg.card.orderStatus) }}</div>
+                  </div>
+                  <el-table v-if="msg.card.items && msg.card.items.length" :data="msg.card.items" size="mini" border>
+                    <el-table-column prop="goods" label="商品" min-width="120" />
+                    <el-table-column prop="sku" label="SKU" min-width="120" />
+                    <el-table-column prop="unit" label="单位" width="80" />
+                    <el-table-column v-if="msg.card.domainType === 'STOCK_CHECK'" prop="beforeQty" label="账面数" width="90" />
+                    <el-table-column prop="quantity" :label="msg.card.domainType === 'STOCK_CHECK' ? '实际数' : '数量'" width="90" />
+                    <el-table-column v-if="!['STOCK_CHECK', 'STOCK_TRANSFER'].includes(msg.card.domainType)" prop="price" label="单价" width="110">
+                      <template slot-scope="scope">
+                        <span>{{ formatCurrency(scope.row.price) }}</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column v-if="!['STOCK_CHECK', 'STOCK_TRANSFER'].includes(msg.card.domainType)" prop="amount" label="金额" width="120">
+                      <template slot-scope="scope">
+                        <span>{{ formatCurrency(scope.row.amount) }}</span>
+                      </template>
+                    </el-table-column>
+                  </el-table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button v-if="showNewMessageHint" class="new-message-hint" @click="jumpToLatest">有新消息，点此查看</button>
+        </div>
+
+        <footer class="composer">
+          <div class="action-chips" v-if="actionChips.length || quickActions.length">
+            <button
+              v-for="(chip, idx) in actionChips"
+              :key="'action-chip-' + idx"
+              class="quick-chip subtle"
+              @click="send(chip.value || chip.name, chip.name || chip.label)"
+            >{{ chip.name || chip.label }}</button>
+            <button
+              v-for="(qa, idx) in quickActions"
+              :key="'qa-' + idx"
+              class="quick-chip"
+              @click="send(quickActionValue(qa), quickActionLabel(qa))"
+            >{{ quickActionLabel(qa) }}</button>
+          </div>
+
+          <div class="input-shell">
+            <el-input
+              ref="composerInput"
+              v-model="draft"
+              type="textarea"
+              :rows="3"
+              resize="none"
+              :disabled="chatLocked || sending"
+              :placeholder="composerPlaceholder"
+              @keydown.native="handleComposerKeydown"
+            />
+            <div class="composer-footer">
+              <div class="composer-tip">Enter 发送，Shift+Enter 换行</div>
+              <div class="composer-actions">
+                <el-button plain :disabled="sending" @click="clearContext">清空当前会话</el-button>
+                <el-button type="primary" :loading="sending" :disabled="chatLocked" @click="send()">发送</el-button>
+              </div>
+            </div>
+          </div>
+        </footer>
+      </section>
+    </div>
+
+    <el-dialog :title="orderDialogTitle" :visible.sync="orderDialogOpen" width="1200px" :fullscreen="orderDialogFullscreen" append-to-body>
+      <template slot="title">
+        <span>{{ orderDialogTitle }}</span>
+        <el-button style="float: right; padding: 3px 0" type="text" @click="toggleOrderDialogFullscreen">
+          <i :class="orderDialogFullscreen ? 'el-icon-news' : 'el-icon-full-screen'"></i>
+          {{ orderDialogFullscreen ? '还原' : '全屏' }}
+        </el-button>
+      </template>
+      <el-form ref="orderForm" :model="orderForm" :rules="orderRules" label-width="100px">
+        <el-row>
+          <el-col :span="8">
+            <!-- 采购订单显示供应商 -->
+            <el-form-item v-if="['PURCHASE_ORDER', 'PO', 'PURCHASE_IN', 'PURCHASE_RETURN'].includes(orderForm.domainType)" label="供应商" prop="supplierId">
+              <div class="select-with-action">
+                <el-select v-model="orderForm.supplierId" placeholder="请选择供应商" :disabled="orderFormView" filterable clearable>
+                  <el-option v-for="item in supplierOptions" :key="item.id" :label="item.supplierName" :value="item.id" />
+                </el-select>
+                <el-button v-if="!orderFormView" type="text" icon="el-icon-plus" @click="addOrderFormSupplier">新增</el-button>
+              </div>
+            </el-form-item>
+            <!-- 销售订单显示客户 -->
+            <el-form-item v-else-if="orderForm.domainType === 'SALES_ORDER'" label="客户" prop="customerId">
+              <div class="select-with-action">
+                <el-select v-model="orderForm.customerId" placeholder="请选择客户" :disabled="orderFormView" filterable clearable>
+                  <el-option v-for="item in customerOptions" :key="item.id" :label="item.customerName" :value="item.id" />
+                </el-select>
+                <el-button v-if="!orderFormView" type="text" icon="el-icon-plus" @click="addOrderFormCustomer">新增</el-button>
+              </div>
+            </el-form-item>
+          </el-col>
+          <!-- 采购入库/退货显示仓库 -->
+          <el-col v-if="['PURCHASE_IN', 'PURCHASE_RETURN'].includes(orderForm.domainType)" :span="8">
+            <el-form-item label="仓库" prop="warehouseId">
+              <div class="select-with-action">
+                <el-select v-model="orderForm.warehouseId" placeholder="请选择仓库" :disabled="orderFormView" filterable clearable>
+                  <el-option v-for="item in warehouseOptions" :key="item.id" :label="item.warehouseName" :value="item.id" />
+                </el-select>
+                <el-button v-if="!orderFormView" type="text" icon="el-icon-plus" @click="addOrderFormWarehouse">新增</el-button>
+              </div>
+            </el-form-item>
+          </el-col>
+          <el-col v-else :span="8">
+            <el-form-item label="订单日期" prop="orderDate">
+              <el-date-picker v-model="orderForm.orderDate" type="date" placeholder="选择日期" value-format="yyyy-MM-dd" :disabled="orderFormView" />
+            </el-form-item>
+          </el-col>
+          <!-- 采购入库显示入库日期，采购退货显示退货日期，采购订单显示交货日期 -->
+          <el-col v-if="orderForm.domainType === 'PURCHASE_IN'" :span="8">
+            <el-form-item label="入库日期" prop="inDate">
+              <el-date-picker v-model="orderForm.inDate" type="date" placeholder="选择日期" value-format="yyyy-MM-dd" :disabled="orderFormView" />
+            </el-form-item>
+          </el-col>
+          <el-col v-else-if="orderForm.domainType === 'PURCHASE_RETURN'" :span="8">
+            <el-form-item label="退货日期" prop="returnDate">
+              <el-date-picker v-model="orderForm.returnDate" type="date" placeholder="选择日期" value-format="yyyy-MM-dd" :disabled="orderFormView" />
+            </el-form-item>
+          </el-col>
+          <el-col v-else :span="8">
+            <el-form-item label="交货日期" prop="deliveryDate">
+              <el-date-picker v-model="orderForm.deliveryDate" type="date" placeholder="选择日期" value-format="yyyy-MM-dd" :disabled="orderFormView" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row v-if="['PURCHASE_IN', 'PURCHASE_RETURN'].includes(orderForm.domainType)">
+          <el-col :span="8">
+            <el-form-item label="经办人" prop="handler">
+              <el-input v-model="orderForm.handler" placeholder="请输入经办人" :disabled="orderFormView" />
+            </el-form-item>
+          </el-col>
+          <el-col v-if="orderForm.domainType === 'PURCHASE_IN'" :span="8">
+            <el-form-item label="订单入库" prop="orderId">
+              <el-select v-model="orderForm.orderId" placeholder="请选择采购订单" :disabled="orderFormView || orderForm.id != null" @change="handleOrderChangeForIn">
+                <el-option v-for="item in approvedOrderOptions" :key="item.id" :label="item.orderNo" :value="item.id" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row>
+          <el-col :span="24">
+            <el-form-item label="备注" prop="remark">
+              <el-input v-model="orderForm.remark" type="textarea" placeholder="请输入备注" :disabled="orderFormView" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-divider content-position="left">订单明细</el-divider>
+
+        <el-table :data="orderForm.items" border style="width: 100%" show-summary :summary-method="getOrderSummaries">
+          <el-table-column type="index" width="50" label="序号" />
+          <el-table-column label="SKU" width="200">
+            <template slot-scope="scope">
+              <div style="display: flex; align-items: center; gap: 5px;">
+                <el-input v-model="scope.row.skuName" placeholder="请选择商品" readonly :disabled="orderFormView || orderForm.id != null" size="small" style="flex: 1" />
+                <el-button icon="el-icon-search" size="mini" :disabled="orderFormView || orderForm.id != null" @click="handleSelectOrderSku(scope.$index)">选择</el-button>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="商品名称" prop="goodsName" width="150" show-overflow-tooltip>
+            <template slot-scope="scope">
+              <span>{{ scope.row.goodsName || '-' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="SKU名称" prop="skuName" width="150" />
+          <el-table-column label="规格" prop="specInfo" width="120" />
+          <el-table-column label="单位" width="140">
+            <template slot-scope="scope">
+              <el-select
+                v-if="!orderFormView && ['PURCHASE_ORDER', 'PO'].includes(orderForm.domainType)"
+                v-model="scope.row.unitName"
+                filterable
+                allow-create
+                default-first-option
+                clearable
+                placeholder="单位可选"
+                size="mini"
+              >
+                <el-option
+                  v-for="unit in unitOptions"
+                  :key="'order-unit-' + unit.id"
+                  :label="unit.unitName"
+                  :value="unit.unitName"
+                />
+              </el-select>
+              <span v-else>{{ scope.row.unitName || '-' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="数量" width="120">
+            <template slot-scope="scope">
+              <el-input-number v-model="scope.row.quantity" :min="0" :precision="2" controls-position="right" :disabled="orderFormView" @change="handleOrderItemChange(scope.row)" style="width: 100%" />
+            </template>
+          </el-table-column>
+          <el-table-column label="单价" width="120">
+            <template slot-scope="scope">
+              <el-input-number v-model="scope.row.price" :min="0" :precision="2" controls-position="right" :disabled="orderFormView" @change="handleOrderItemChange(scope.row)" style="width: 100%" />
+            </template>
+          </el-table-column>
+          <el-table-column label="折扣(元)" width="100">
+            <template slot-scope="scope">
+              <el-input-number v-model="scope.row.discount" :min="0" :precision="2" controls-position="right" :disabled="orderFormView" @change="handleOrderItemChange(scope.row)" style="width: 100%" />
+            </template>
+          </el-table-column>
+          <el-table-column label="金额" prop="amount" width="120" align="right">
+            <template slot-scope="scope">
+              <span>{{ scope.row.amount ? Number(scope.row.amount).toFixed(2) : '0.00' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="备注" width="150">
+            <template slot-scope="scope">
+              <el-input v-model="scope.row.remark" placeholder="备注" :disabled="orderFormView" />
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="60" v-if="canEditOrderItems()">
+            <template slot-scope="scope">
+              <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDeleteOrderItem(scope.$index)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <el-button v-if="canAddOrderItems()" type="dashed" icon="el-icon-plus" size="small" @click="handleSelectOrderSku()" style="width: 100%; margin-top: 10px">添加商品</el-button>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button v-if="!orderFormView" type="primary" @click="submitOrderForm">确 定</el-button>
+        <el-button @click="closeOrderDialog">{{ orderFormView ? '关 闭' : '取 消' }}</el-button>
+      </div>
+    </el-dialog>
+
+    <goods-sku-selector ref="skuSelector" @confirm="handleOrderSkuSelected" />
+  </div>
+</template>
+
+<script>
+import { mapGetters } from 'vuex'
+import {
+  getPcPurchaseOrderActions,
+  startPcPurchaseOrderChat,
+  chatPcPurchaseOrder,
+  clearPcPurchaseOrderContext
+} from '@/api/wms/aiAssistantPc'
+import { addUnit, listUnit } from '@/api/wms/unit'
+import { addGoodsCategory, listGoodsCategory } from '@/api/wms/goodsCategory'
+import { addSupplier, listSupplier } from '@/api/wms/supplier'
+import { listCustomer, addCustomer } from '@/api/wms/customer'
+import { addWarehouse, listWarehouse } from '@/api/wms/warehouse'
+import { getBillNeedApprove } from '@/api/wms/approvePolicy'
+import { getPurchaseOrder, updatePurchaseOrder, delPurchaseOrder, approvePurchaseOrder, getAvailablePurchaseOrdersForIn } from '@/api/wms/purchaseOrder'
+import { getPurchaseIn, updatePurchaseIn, delPurchaseIn, approvePurchaseIn, getOrderItems, getAvailablePurchaseInForReturn } from '@/api/wms/purchaseIn'
+import { getPurchaseReturn, updatePurchaseReturn, delPurchaseReturn, approvePurchaseReturn } from '@/api/wms/purchaseReturn'
+import { getSalesOrder, updateSalesOrder, delSalesOrder, approveSalesOrder } from '@/api/wms/salesOrder'
+import { getSalesOut, delSalesOut, approveSalesOut } from '@/api/wms/salesOut'
+import { getSalesReturn, delSalesReturn, approveSalesReturn } from '@/api/wms/salesReturn'
+import { getStockCheck, delStockCheck, approveStockCheck } from '@/api/wms/stockCheck'
+import { getStockTransfer, delStockTransfer, approveStockTransfer } from '@/api/wms/stockTransfer'
+import GoodsSkuSelector from '@/components/GoodsSkuSelector'
+
+export default {
+  name: 'WmsAiAssistantPc',
+  components: { GoodsSkuSelector },
+  data() {
+    return {
+      actions: [],
+      conversations: [],
+      activeConversationId: '',
+      messages: [],
+      quickActions: [],
+      context: {},
+      unitOptions: [],
+      categoryOptions: [],
+      supplierOptions: [],
+      customerOptions: [],
+      warehouseOptions: [],
+      conversationId: '',
+      draft: '',
+      sending: false,
+      scenarioRunning: false,
+      isNearBottom: true,
+      showNewMessageHint: false,
+      storageKey: 'wms-ai-pc-chat-history-v2',
+      candidateSelectionCache: {
+        goods: []
+      },
+      showApproveAction: true,
+      orderDialogOpen: false,
+      orderDialogTitle: '',
+      orderDialogFullscreen: false,
+      orderFormView: false,
+      currentOrderMessageIndex: -1,
+      currentOrderItemIndex: -1,
+      orderForm: {
+        items: []
+      },
+      approvedOrderOptions: [],
+      orderRules: {
+        supplierId: [
+          { required: true, message: '供应商不能为空', trigger: 'change' }
+        ],
+        customerId: [
+          { required: true, message: '客户不能为空', trigger: 'change' }
+        ],
+        warehouseId: [
+          { required: true, message: '仓库不能为空', trigger: 'change' }
+        ],
+        inDate: [
+          { required: true, message: '入库日期不能为空', trigger: 'change' }
+        ],
+        returnDate: [
+          { required: true, message: '退货日期不能为空', trigger: 'change' }
+        ]
+      }
+    }
+  },
+  created() {
+    this.initialize()
+  },
+  computed: {
+    ...mapGetters([
+      'avatar'
+    ]),
+    aiLogo() {
+      return 'https://sysfile-1257741456.cos.ap-guangzhou.myqcloud.com/zhicun_wms/logo.png'
+    },
+    actionChips() {
+      return this.actions || []
+    },
+    currentTitle() {
+      const current = this.conversations.find(item => item.conversationId === this.activeConversationId)
+      return current && current.title ? current.title : '新对话'
+    },
+    currentSubtitle() {
+      if (this.context && this.context.step && this.context.domainType) {
+        const mode = this.context.createMode === 'LINKED'
+          ? '关联单'
+          : (this.context.createMode === 'DIRECT' ? '直接建单' : '')
+        return `当前流程：${this.formatDomainType(this.context.domainType)}${mode ? ' / ' + mode : ''} / ${this.context.step}`
+      }
+      if (this.context && this.context.step) {
+        return `当前流程：${this.context.step}`
+      }
+      if (this.context && this.context.lastOrderNo) {
+        return `最近创建单号：${this.context.lastOrderNo}`
+      }
+      return '一句话创建采购、销售、盘点、调拨单据，支持自然语句输入、候选分页确认和聊天内新增基础资料。'
+    },
+    activeAssistantCard() {
+      for (let index = this.messages.length - 1; index >= 0; index -= 1) {
+        const message = this.messages[index]
+        if (message && message.role === 'assistant' && message.card) {
+          return message.card
+        }
+      }
+      return null
+    },
+    chatLocked() {
+      const card = this.activeAssistantCard
+      return !!card && (
+        card.type === 'REQUIRED_FORM' ||
+        (card.type === 'DIFF_PREVIEW' && card.editable)
+      )
+    },
+    composerPlaceholder() {
+      if (this.chatLocked) {
+        return '请先完成当前卡片操作，再继续自由输入'
+      }
+      return '直接输入一句业务话术，例如：卖给客户A苹果笔记本10台，单价9000元；从一号仓库调30台到二号仓库；盘点一号仓库所有商品'
+    },
+    groupedConversations() {
+      const now = Date.now()
+      const buckets = [
+        { key: 'today', label: '今天', items: [] },
+        { key: 'week', label: '近7天', items: [] },
+        { key: 'older', label: '更早', items: [] }
+      ]
+      ;(this.conversations || []).forEach(item => {
+        const diff = now - (item.updatedAt || now)
+        if (diff < 24 * 60 * 60 * 1000) {
+          buckets[0].items.push(item)
+        } else if (diff < 7 * 24 * 60 * 60 * 1000) {
+          buckets[1].items.push(item)
+        } else {
+          buckets[2].items.push(item)
+        }
+      })
+      return buckets.filter(group => group.items.length)
+    }
+  },
+  methods: {
+    async initialize() {
+      const [actionsResp, unitResp, categoryResp, supplierResp, customerResp, warehouseResp, approveResp, availableOrdersResp] = await Promise.all([
+        getPcPurchaseOrderActions(),
+        listUnit(),
+        listGoodsCategory(),
+        listSupplier(),
+        listCustomer(),
+        listWarehouse(),
+        getBillNeedApprove('PURCHASE_ORDER').catch(() => ({ data: true })),
+        getAvailablePurchaseOrdersForIn().catch(() => ({ data: [] }))
+      ])
+      this.actions = actionsResp.data || []
+      this.unitOptions = unitResp.data || []
+      this.categoryOptions = this.normalizeCategoryOptions(categoryResp.data || [])
+      this.supplierOptions = supplierResp.data || []
+      this.customerOptions = customerResp.data || []
+      this.warehouseOptions = warehouseResp.data || []
+      this.approvedOrderOptions = availableOrdersResp.data || []
+      this.showApproveAction = approveResp.data !== false
+      this.restoreConversations()
+      if (this.conversations.length) {
+        this.activateConversation(this.conversations[0].conversationId)
+        return
+      }
+      await this.startNewConversation()
+    },
+    resetOrderForm() {
+      this.orderForm = {
+        id: null,
+        supplierId: null,
+        customerId: null,
+        warehouseId: null,
+        orderId: null,
+        inId: null,
+        sourceType: 1,
+        orderDate: '',
+        deliveryDate: '',
+        inDate: '',
+        returnDate: '',
+        paidAmount: 0,
+        handler: null,
+        remark: null,
+        items: [],
+        domainType: null
+      }
+    },
+    closeOrderDialog() {
+      this.orderDialogOpen = false
+      this.orderDialogFullscreen = false
+      this.orderFormView = false
+      this.currentOrderMessageIndex = -1
+      this.currentOrderItemIndex = -1
+      this.resetOrderForm()
+      this.$nextTick(() => {
+        this.resetForm('orderForm')
+      })
+    },
+    formatOrderStatus(status) {
+      return status === '0'
+        ? '待审核'
+        : (status === '1'
+          ? '已审核'
+          : (status === '2'
+            ? '部分入库'
+            : (status === '3' ? '全部入库' : '已关闭')))
+    },
+    formatDomainType(domainType) {
+      const map = {
+        PURCHASE_ORDER: '采购订单',
+        PO: '采购订单',
+        PURCHASE_IN: '采购入库',
+        PI: '采购入库',
+        PURCHASE_RETURN: '采购退货',
+        SALES_ORDER: '销售订单',
+        SALES_OUT: '销售出库',
+        SALES_RETURN: '销售退货',
+        STOCK_CHECK: '库存盘点',
+        STOCK_TRANSFER: '库存调拨',
+        PR: '采购退货',
+        SO: '销售订单',
+        SOUT: '销售出库',
+        SR: '销售退货',
+        SC: '库存盘点',
+        ST: '库存调拨'
+      }
+      return map[domainType] || domainType || '-'
+    },
+    formatCheckType(value) {
+      const map = {
+        FULL: '全盘',
+        SAMPLE: '抽盘',
+        DYNAMIC: '动态盘点'
+      }
+      return map[value] || value || '-'
+    },
+    formatCurrency(value) {
+      const amount = Number(value)
+      if (Number.isNaN(amount)) {
+        return '￥0.00'
+      }
+      return `￥${amount.toFixed(2)}`
+    },
+    normalizeCategoryOptions(list) {
+      const result = []
+      const walk = items => {
+        ;(items || []).forEach(item => {
+          if (!item || item.status === '1') return
+          result.push({
+            id: item.id,
+            categoryName: item.categoryName
+          })
+          if (Array.isArray(item.children) && item.children.length) {
+            walk(item.children)
+          }
+        })
+      }
+      walk(Array.isArray(list) ? list : [])
+      return result
+    },
+    normalizeDecimalInput(value) {
+      const text = value === undefined || value === null ? '' : String(value)
+      const cleaned = text
+        .replace(/[^\d.]/g, '')
+        .replace(/\.(?=.*\.)/g, '')
+        .replace(/^(\d+\.\d{0,2}).*$/, '$1')
+      return cleaned.startsWith('.') ? `0${cleaned}` : cleaned
+    },
+    handleSkuNumberInput(row, field, value) {
+      if (!row) return
+      this.$set(row, field, this.normalizeDecimalInput(value))
+    },
+    async refreshUnitOptions() {
+      const resp = await listUnit()
+      this.unitOptions = resp.data || []
+    },
+    async refreshCategoryOptions() {
+      const resp = await listGoodsCategory()
+      this.categoryOptions = this.normalizeCategoryOptions(resp.data || [])
+    },
+    async initializeSupplierOptions() {
+      const resp = await listSupplier()
+      this.supplierOptions = resp.data || []
+    },
+    async initializeWarehouseOptions() {
+      const resp = await listWarehouse()
+      this.warehouseOptions = resp.data || []
+    },
+    async initializeCustomerOptions() {
+      const resp = await listCustomer()
+      this.customerOptions = resp.data || []
+    },
+    async addInlineUnit(msg) {
+      try {
+        const { value } = await this.$prompt('请输入单位名称', '新增单位', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          inputValue: msg && msg.card && msg.card.formModel ? msg.card.formModel.unitName : '',
+          inputPattern: /\S+/,
+          inputErrorMessage: '单位名称不能为空'
+        })
+        await addUnit({ unitName: value, status: '0' })
+        await this.refreshUnitOptions()
+        if (msg && msg.card && msg.card.formModel) {
+          this.$set(msg.card.formModel, 'unitName', value)
+        }
+        this.$message.success('单位已新增')
+      } catch (error) {
+        if (error !== 'cancel') {
+          throw error
+        }
+      }
+    },
+    async addInlineCategory(msg) {
+      try {
+        const { value } = await this.$prompt('请输入分类名称', '新增分类', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          inputValue: msg && msg.card && msg.card.formModel ? msg.card.formModel.categoryName : '',
+          inputPattern: /\S+/,
+          inputErrorMessage: '分类名称不能为空'
+        })
+        const resp = await addGoodsCategory({ categoryName: value, parentId: 0, orderNum: 0, status: '0' })
+        await this.refreshCategoryOptions()
+        if (msg && msg.card && msg.card.formModel) {
+          this.$set(msg.card.formModel, 'categoryName', value)
+          this.$set(msg.card.formModel, 'categoryId', resp.data)
+        }
+        this.$message.success('分类已新增')
+      } catch (error) {
+        if (error !== 'cancel') {
+          throw error
+        }
+      }
+    },
+    handleGoodsCategoryChange(msg, value) {
+      if (!msg || !msg.card || !msg.card.formModel) return
+      const hit = this.categoryOptions.find(item => item.id === value)
+      this.$set(msg.card.formModel, 'categoryName', hit ? hit.categoryName : '')
+    },
+    canEditResult(card) {
+      return !!card && !card.deleted && this.supportsEditAction(card) && String(card.orderStatus) === '0'
+    },
+    canApproveResult(card) {
+      return !!card && !card.deleted && this.showApproveAction && this.supportsApproveAction(card) && String(card.orderStatus) === '0'
+    },
+    canDeleteResult(card) {
+      return !!card && !card.deleted && this.supportsDeleteAction(card) && String(card.orderStatus) === '0'
+    },
+    canPrintResult(card) {
+      return !!card && !card.deleted && card.id && this.supportsPrintAction(card) && String(card.orderStatus) === '1'
+    },
+    supportsResultActions(card) {
+      return this.supportsEditAction(card) || this.supportsApproveAction(card) || this.supportsDeleteAction(card) || this.supportsPrintAction(card)
+    },
+    supportsEditAction(card) {
+      return !!card && ['PURCHASE_ORDER', 'PO', 'PURCHASE_IN', 'PURCHASE_RETURN', 'SALES_ORDER', 'SALES_OUT', 'SALES_RETURN', 'STOCK_CHECK', 'STOCK_TRANSFER'].includes(card.domainType)
+    },
+    supportsApproveAction(card) {
+      return !!card && ['PURCHASE_ORDER', 'PO', 'PURCHASE_IN', 'PURCHASE_RETURN', 'SALES_ORDER', 'SALES_OUT', 'SALES_RETURN', 'STOCK_CHECK', 'STOCK_TRANSFER'].includes(card.domainType)
+    },
+    supportsDeleteAction(card) {
+      return !!card && ['PURCHASE_ORDER', 'PO', 'PURCHASE_IN', 'PURCHASE_RETURN', 'SALES_ORDER', 'SALES_OUT', 'SALES_RETURN', 'STOCK_CHECK', 'STOCK_TRANSFER'].includes(card.domainType)
+    },
+    supportsPrintAction(card) {
+      return !!card && ['PURCHASE_ORDER', 'PO', 'PURCHASE_IN', 'PURCHASE_RETURN', 'SALES_ORDER', 'SALES_OUT', 'SALES_RETURN', 'STOCK_CHECK', 'STOCK_TRANSFER'].includes(card.domainType)
+    },
+    isMultiCandidateCard(card) {
+      return !!card && card.type === 'CANDIDATE' && card.selectionMode === 'multi-list'
+    },
+    getCandidateSelectionCacheKey(card) {
+      if (!card || card.type !== 'CANDIDATE') return ''
+      const otherValue = card.otherOption && card.otherOption.value
+      if (typeof otherValue === 'string' && otherValue.indexOf('__SELECT__GOODS:') === 0) {
+        return 'goods'
+      }
+      return ''
+    },
+    candidateOptionId(opt) {
+      if (!opt) return ''
+      const value = typeof opt === 'string' ? opt : opt.value
+      if (!value) return ''
+      if (String(value).indexOf('__SELECT__GOODS:') === 0) {
+        return String(value).substring('__SELECT__GOODS:'.length)
+      }
+      return String(value)
+    },
+    candidateOptionLabel(opt) {
+      if (!opt) return '-'
+      return opt.label || opt.name || this.candidateOptionId(opt) || '-'
+    },
+    candidateDisplayOptions(card) {
+      if (!card || !Array.isArray(card.options)) return []
+      // 远程搜索模式：结果已由后端过滤，直接返回
+      if (card.remoteSearch) return card.options
+      const keyword = String(card.searchKeyword || '').trim().toLowerCase()
+      if (!keyword) return card.options
+      return card.options.filter(opt => this.candidateOptionLabel(opt).toLowerCase().includes(keyword))
+    },
+    extractCandidateSourceId(opt) {
+      if (!opt) return null
+      if (opt.id) return Number(opt.id)
+      const value = String(opt.value || '')
+      if (value.indexOf('__SELECT__LINK_ORDER:') === 0) {
+        return Number(value.substring('__SELECT__LINK_ORDER:'.length))
+      }
+      return null
+    },
+    handleCandidateSearchInput(msg) {
+      if (!msg || !msg.card || !msg.card.remoteSearch) return
+      if (this._remoteSearchTimer) {
+        clearTimeout(this._remoteSearchTimer)
+      }
+      this._remoteSearchTimer = setTimeout(() => {
+        this.remoteSearchCandidates(msg)
+      }, 300)
+    },
+    remoteSearchCandidates(msg) {
+      if (!msg || !msg.card || !msg.card.remoteSearch) return
+      const keyword = String(msg.card.searchKeyword || '').trim()
+      if (!keyword) {
+        this.$set(msg.card, 'options', [])
+        this.$set(msg.card, 'totalCount', 0)
+        return
+      }
+      if (msg.card.remoteSearchDomain === 'PURCHASE_RETURN') {
+        this.$set(msg.card, '_searching', true)
+        getAvailablePurchaseInForReturn(keyword).then(res => {
+          const list = (res.data || []).map(item => ({
+            label: item.inNo + ' / ' + (item.supplierName || '未知供应商'),
+            value: '__SELECT__LINK_ORDER:' + item.id,
+            id: item.id
+          }))
+          this.$set(msg.card, 'options', list)
+          this.$set(msg.card, 'totalCount', list.length)
+        }).catch((e) => {
+          console.error('远程搜索失败', e)
+          this.$message.error('搜索失败，请重试')
+        }).finally(() => {
+          this.$set(msg.card, '_searching', false)
+        })
+      }
+    },
+    canViewCandidateDetail(card, opt) {
+      return !!card && card.sourceDomainType === 'PURCHASE_ORDER' && !!this.extractCandidateSourceId(opt)
+    },
+    templateLabel(tpl) {
+      if (!tpl) return '-'
+      return typeof tpl === 'string' ? tpl : (tpl.label || tpl.text || tpl.value || '-')
+    },
+    templateValue(tpl) {
+      if (!tpl) return ''
+      return typeof tpl === 'string' ? tpl : (tpl.value || tpl.label || '')
+    },
+    normalizeTemplateDraftValue(tpl) {
+      const raw = this.templateValue(tpl)
+      if (!raw) return this.templateLabel(tpl)
+      if (raw.startsWith('__ROUTE__')) {
+        const index = raw.indexOf('::')
+        return index >= 0 ? raw.substring(index + 2) : this.templateLabel(tpl)
+      }
+      return raw
+    },
+    async copyText(text, successMessage) {
+      if (!text) return
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text)
+        } else {
+          const input = document.createElement('textarea')
+          input.value = text
+          input.setAttribute('readonly', 'readonly')
+          input.style.position = 'fixed'
+          input.style.left = '-9999px'
+          document.body.appendChild(input)
+          input.select()
+          document.execCommand('copy')
+          document.body.removeChild(input)
+        }
+        this.$message.success(successMessage || '复制成功')
+      } catch (error) {
+        this.$message.error('复制失败')
+      }
+    },
+    copyTemplateText(tpl) {
+      return this.copyText(this.normalizeTemplateDraftValue(tpl), '模板内容已复制')
+    },
+    applyTemplateDraft(tpl) {
+      const text = this.normalizeTemplateDraftValue(tpl)
+      this.draft = text
+      this.$nextTick(() => {
+        if (this.$refs.composerInput && this.$refs.composerInput.focus) {
+          this.$refs.composerInput.focus()
+        }
+      })
+      this.$message.success('模板内容已填入输入框，可修改后再发送')
+    },
+    previewTipText(card) {
+      if (!card) return ''
+      if (card.domainType === 'STOCK_CHECK') {
+        return '盘点确认前可直接修改实际数量，也可以删除误选商品行。'
+      }
+      if (card.linkedMode) {
+        return '关联单模式下仅允许删减来源行或修改数量，不允许新增来源单外商品。'
+      }
+      if (card.domainType === 'PURCHASE_ORDER') {
+        return '确认前可补充供应商，并直接修改商品数量和单价。'
+      }
+      if (card.domainType === 'PURCHASE_IN') {
+        return '确认前可补充供应商、仓库，并直接修改商品数量和单价。'
+      }
+      if (card.domainType === 'SALES_ORDER') {
+        return '确认前可补充客户，并直接修改商品数量和单价。'
+      }
+      return '确认前可直接修改明细数量。'
+    },
+    quickActionLabel(action) {
+      if (!action) return '-'
+      return typeof action === 'string' ? action : (action.label || action.name || action.value || '-')
+    },
+    quickActionValue(action) {
+      if (!action) return ''
+      if (typeof action !== 'string') {
+        return action.value || action.label || ''
+      }
+      const routeMap = {
+        '采购订单': '__ACTION__:CREATE_PO',
+        '采购入库': '__ACTION__:CREATE_PI',
+        '采购退货': '__ACTION__:CREATE_PR',
+        '销售订单': '__ACTION__:CREATE_SO',
+        '销售出库': '__ACTION__:CREATE_SOUT',
+        '销售退货': '__ACTION__:CREATE_SR',
+        '库存盘点': '__ACTION__:CREATE_SC',
+        '库存调拨': '__ACTION__:CREATE_ST',
+        '查看刚创建的订单': '__ACTION__:QUERY_PO',
+        '查询采购订单': '__ACTION__:QUERY_PO',
+        '再来一单采购': '__ACTION__:CREATE_PO',
+        '再来一单采购订单': '__ACTION__:CREATE_PO',
+        '再来一单采购入库': '__ACTION__:CREATE_PI',
+        '再来一单采购退货': '__ACTION__:CREATE_PR',
+        '再来一单销售订单': '__ACTION__:CREATE_SO',
+        '再来一单销售出库': '__ACTION__:CREATE_SOUT',
+        '再来一单销售退货': '__ACTION__:CREATE_SR',
+        '再来一单库存盘点': '__ACTION__:CREATE_SC',
+        '再来一单库存调拨': '__ACTION__:CREATE_ST'
+      }
+      return routeMap[action] || action
+    },
+    getCachedCandidateSelections(card) {
+      const key = this.getCandidateSelectionCacheKey(card)
+      if (!key) return []
+      const list = this.candidateSelectionCache && Array.isArray(this.candidateSelectionCache[key])
+        ? this.candidateSelectionCache[key]
+        : []
+      return Array.from(new Set(list.map(item => String(item)).filter(Boolean)))
+    },
+    syncCandidateSelectionCache(card) {
+      const key = this.getCandidateSelectionCacheKey(card)
+      if (!key) return
+      const selected = Array.isArray(card.selectedSkuIds)
+        ? Array.from(new Set(card.selectedSkuIds.map(item => String(item)).filter(Boolean)))
+        : []
+      this.$set(this.candidateSelectionCache, key, selected)
+      this.syncConversationSnapshot()
+    },
+    handleCandidateSelectionChange(card) {
+      if (!this.isMultiCandidateCard(card)) return
+      this.syncCandidateSelectionCache(card)
+    },
+    currentPageCandidateIds(card) {
+      if (!card || !Array.isArray(card.options)) return []
+      return card.options.map(opt => this.candidateOptionId(opt)).filter(Boolean)
+    },
+    hasCurrentPageCandidate(card) {
+      return this.currentPageCandidateIds(card).length > 0
+    },
+    hasCurrentPageSelected(card) {
+      if (!this.isMultiCandidateCard(card)) return false
+      const selected = new Set((card.selectedSkuIds || []).map(item => String(item)))
+      return this.currentPageCandidateIds(card).some(id => selected.has(String(id)))
+    },
+    selectAllCurrentPage(msg) {
+      if (!msg || !msg.card || !this.isMultiCandidateCard(msg.card)) return
+      const merged = new Set((msg.card.selectedSkuIds || []).map(item => String(item)))
+      this.currentPageCandidateIds(msg.card).forEach(id => merged.add(String(id)))
+      this.$set(msg.card, 'selectedSkuIds', Array.from(merged))
+      this.syncCandidateSelectionCache(msg.card)
+    },
+    clearCurrentPageSelection(msg) {
+      if (!msg || !msg.card || !this.isMultiCandidateCard(msg.card)) return
+      const currentPageIds = new Set(this.currentPageCandidateIds(msg.card).map(item => String(item)))
+      const kept = (msg.card.selectedSkuIds || []).map(item => String(item)).filter(id => !currentPageIds.has(id))
+      this.$set(msg.card, 'selectedSkuIds', kept)
+      this.syncCandidateSelectionCache(msg.card)
+    },
+    clearAllCandidateSelection(msg) {
+      if (!msg || !msg.card || !this.isMultiCandidateCard(msg.card)) return
+      this.$set(msg.card, 'selectedSkuIds', [])
+      this.syncCandidateSelectionCache(msg.card)
+    },
+    candidateSelectedCount(card) {
+      if (this.isMultiCandidateCard(card)) {
+        return Array.isArray(card.selectedSkuIds) ? card.selectedSkuIds.length : 0
+      }
+      return card && card.selectedValue ? 1 : 0
+    },
+    canConfirmCandidate(card) {
+      return this.candidateSelectedCount(card) > 0
+    },
+    isHistoryMessage(index) {
+      const latestInteractiveIndex = this.getLatestInteractiveMessageIndex()
+      return latestInteractiveIndex >= 0 ? index !== latestInteractiveIndex : false
+    },
+    getLatestInteractiveMessageIndex() {
+      for (let index = this.messages.length - 1; index >= 0; index -= 1) {
+        const msg = this.messages[index]
+        if (msg && msg.role === 'assistant' && msg.card) {
+          return index
+        }
+      }
+      return -1
+    },
+    candidateIndex(card, index) {
+      return index + 1
+    },
+    buildCandidatePager(card) {
+      const total = Number(card.totalPages || 1)
+      const page = Number(card.page || 1)
+      if (total <= 1) return '...'
+      if (total <= 5) {
+        return Array.from({ length: total }, (_, idx) => idx + 1).map(num => (num === page ? `[${num}]` : String(num))).join(' ')
+      }
+      if (page <= 3) {
+        return `1 2 3 ... ${total}`
+      }
+      if (page >= total - 2) {
+        return `1 ... ${total - 2} ${total - 1} ${total}`
+      }
+      return `1 ... ${page - 1} [${page}] ${page + 1} ... ${total}`
+    },
+    sendCandidatePaging(action) {
+      this.send(action, action)
+    },
+    confirmCandidateSelection(msg) {
+      if (!msg || !msg.card) {
+        this.$message.warning('请先勾选候选项')
+        return
+      }
+      if (this.isMultiCandidateCard(msg.card)) {
+        const selectedSkuIds = Array.isArray(msg.card.selectedSkuIds)
+          ? Array.from(new Set(msg.card.selectedSkuIds.map(item => String(item)).filter(Boolean)))
+          : []
+        if (!selectedSkuIds.length) {
+          this.$message.warning('请先勾选至少一个候选项')
+          return
+        }
+        const payload = `__SELECT__GOODS:${selectedSkuIds.join(',')}`
+        this.send(payload, `已确认 ${selectedSkuIds.length} 个商品候选`)
+        return
+      }
+      if (!msg.card.selectedValue) {
+        this.$message.warning('请先勾选一个候选项')
+        return
+      }
+      const selected = (msg.card.options || []).find(item => item.value === msg.card.selectedValue)
+      this.send(msg.card.selectedValue, selected ? `选择：${this.candidateOptionLabel(selected)}` : '已确认选择')
+    },
+    buildExecResultCard(order) {
+      // 处理日期字段，将LocalDate转换为字符串格式
+      const formatDate = (date) => {
+        if (!date) return ''
+        if (typeof date === 'string') return date
+        if (typeof date === 'object' && date.toString) {
+          const str = date.toString()
+          return str.split('T')[0] || ''
+        }
+        return ''
+      }
+      const card = {
+        type: 'EXEC_RESULT',
+        domainType: 'PURCHASE_ORDER',
+        id: order.id,
+        orderNo: order.orderNo,
+        supplierName: order.supplierName,
+        orderDate: formatDate(order.orderDate),
+        orderStatus: order.orderStatus,
+        totalAmount: order.totalAmount,
+        items: []
+      }
+      card.items = Array.isArray(order.items)
+        ? order.items.map(item => ({
+          goods: item.goodsName,
+          sku: item.skuName,
+          unit: item.unitName,
+          quantity: item.quantity,
+          price: item.price,
+          amount: item.amount
+        }))
+        : []
+      return card
+    },
+    async refreshResultOrderCard(msg) {
+      if (!msg || !msg.card || !msg.card.id) return
+      const card = await this.fetchResultCardData(msg.card.domainType, msg.card.id)
+      if (!card) return
+      this.$set(msg, 'card', card)
+      this.syncConversationSnapshot()
+    },
+    async openOrderEditor(msg) {
+      if (!msg || !msg.card || !msg.card.id) return
+      
+      // 日期格式化函数
+      const formatDate = (date) => {
+        if (!date) return ''
+        if (typeof date === 'string') return date
+        if (typeof date === 'object' && date.toString) {
+          const str = date.toString()
+          return str.split('T')[0] || ''
+        }
+        return ''
+      }
+      
+      // 采购入库在AI助手中直接打开编辑对话框
+      if (msg.card.domainType === 'PURCHASE_IN') {
+        this.resetOrderForm()
+        const resp = await getPurchaseIn(msg.card.id)
+        const data = resp.data || { items: [] }
+        // 将LocalDate转换为字符串格式
+        data.inDate = formatDate(data.inDate)
+        this.orderForm = data
+        this.orderForm.domainType = 'PURCHASE_IN'
+        this.orderForm.sourceType = this.orderForm.sourceType || 1  // 默认直接入库
+        this.orderForm.handler = this.orderForm.handler || this.$store.getters.name  // 默认当前用户
+        this.orderFormView = false
+        this.orderDialogOpen = true
+        this.orderDialogTitle = '修改采购入库'
+        this.currentOrderMessageIndex = this.messages.indexOf(msg)
+        return
+      }
+      
+      // 采购退货在AI助手中直接打开编辑对话框
+      if (msg.card.domainType === 'PURCHASE_RETURN') {
+        this.resetOrderForm()
+        const resp = await getPurchaseReturn(msg.card.id)
+        const data = resp.data || { items: [] }
+        // 将LocalDate转换为字符串格式
+        data.returnDate = formatDate(data.returnDate)
+        this.orderForm = data
+        this.orderForm.domainType = 'PURCHASE_RETURN'
+        this.orderForm.sourceType = this.orderForm.sourceType || 1  // 默认直接退货
+        this.orderForm.handler = this.orderForm.handler || this.$store.getters.name  // 默认当前用户
+        this.orderFormView = false
+        this.orderDialogOpen = true
+        this.orderDialogTitle = '修改采购退货'
+        this.currentOrderMessageIndex = this.messages.indexOf(msg)
+        return
+      }
+      
+      // 采购订单在AI助手中直接打开编辑对话框
+      if (!['PURCHASE_ORDER', 'PO', 'SALES_ORDER'].includes(msg.card.domainType)) {
+        this.openResultModule(msg.card)
+        return
+      }
+      // 销售订单在AI助手中直接打开编辑对话框
+      if (msg.card.domainType === 'SALES_ORDER') {
+        this.resetOrderForm()
+        const resp = await getSalesOrder(msg.card.id)
+        const data = resp.data || { items: [] }
+        // 将LocalDate转换为字符串格式
+        data.orderDate = formatDate(data.orderDate)
+        data.deliveryDate = formatDate(data.deliveryDate)
+        this.orderForm = data
+        this.orderForm.domainType = 'SALES_ORDER'
+        this.orderFormView = false
+        this.orderDialogOpen = true
+        this.orderDialogTitle = '修改销售订单'
+        this.currentOrderMessageIndex = this.messages.indexOf(msg)
+        return
+      }
+      this.resetOrderForm()
+      const resp = await getPurchaseOrder(msg.card.id)
+      const data = resp.data || { items: [] }
+      // 将LocalDate转换为字符串格式
+      data.orderDate = formatDate(data.orderDate)
+      data.deliveryDate = formatDate(data.deliveryDate)
+      this.orderForm = data
+      this.orderForm.domainType = 'PURCHASE_ORDER'
+      this.orderFormView = false
+      this.orderDialogOpen = true
+      this.orderDialogTitle = '修改采购订单'
+      this.currentOrderMessageIndex = this.messages.indexOf(msg)
+    },
+    async openCandidateDetail(card, opt) {
+      if (!this.canViewCandidateDetail(card, opt)) return
+      const id = this.extractCandidateSourceId(opt)
+      if (!id) return
+      this.resetOrderForm()
+      const resp = await getPurchaseOrder(id)
+      const data = resp.data || { items: [] }
+      data.orderDate = data.orderDate || ''
+      data.deliveryDate = data.deliveryDate || ''
+      this.orderForm = data
+      this.orderForm.domainType = 'PURCHASE_ORDER'
+      this.orderFormView = true
+      this.orderDialogOpen = true
+      this.orderDialogTitle = '采购订单详情'
+      this.currentOrderMessageIndex = -1
+    },
+    async approveResultOrder(msg) {
+      if (!msg || !msg.card || !msg.card.id) return
+      await this.$confirm(`是否确认审核单据"${msg.card.billNo || msg.card.orderNo || msg.card.id}"？`, '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      })
+      await this.approveResultByDomain(msg.card)
+      await this.refreshResultOrderCard(msg)
+      this.$modal.msgSuccess('审核成功')
+    },
+    async deleteResultOrder(msg) {
+      if (!msg || !msg.card || !msg.card.id) return
+      await this.$confirm(`是否确认删除单据"${msg.card.billNo || msg.card.orderNo || msg.card.id}"？`, '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      })
+      await this.deleteResultByDomain(msg.card)
+      this.$set(msg, 'card', Object.assign({}, msg.card, { deleted: true, orderStatus: 'deleted', items: [] }))
+      msg.text = `${this.formatDomainType(msg.card.domainType)}已删除。`
+      this.syncConversationSnapshot()
+      this.$modal.msgSuccess('删除成功')
+    },
+    printResultOrder(card) {
+      if (!this.canPrintResult(card)) {
+        this.$modal.msgWarning('仅已审核单据支持打印')
+        return
+      }
+      const route = this.$router.resolve({
+        path: this.getPrintRouteByDomain(card.domainType),
+        query: {
+          id: card.id,
+          from: this.$route.fullPath
+        }
+      })
+      window.open(route.href, '_blank')
+    },
+    openResultModule(card) {
+      // 使用已知的路径映射（基于后端返回的路由配置）
+      const pathMap = {
+        PURCHASE_IN: '/purchase/purchaseIn',
+        PURCHASE_RETURN: '/purchase/purchaseReturn',
+        SALES_ORDER: '/sales/salesOrder',
+        SALES_OUT: '/sales/salesOut',
+        SALES_RETURN: '/sales/salesReturn',
+        STOCK_CHECK: '/stock/stockCheck',
+        STOCK_TRANSFER: '/stock/stockTransfer',
+        PURCHASE_ORDER: '/purchase/purchaseOrder',
+        PO: '/purchase/purchaseOrder'
+      }
+      const path = pathMap[card.domainType]
+      if (!path) return
+      this.$router.push({ path, query: { focusId: card.id } }).catch(err => {
+        console.error('路由跳转失败:', err)
+      })
+    },
+    getPrintRouteByDomain(domainType) {
+      const map = {
+        PURCHASE_ORDER: '/wms/purchaseOrder/print/index',
+        PO: '/wms/purchaseOrder/print/index',
+        PURCHASE_IN: '/wms/purchaseIn/print/index',
+        PURCHASE_RETURN: '/wms/purchaseReturn/print/index',
+        SALES_ORDER: '/wms/salesOrder/print/index',
+        SALES_OUT: '/wms/salesOut/print/index',
+        SALES_RETURN: '/wms/salesReturn/print/index',
+        STOCK_CHECK: '/wms/stockCheck/print/index',
+        STOCK_TRANSFER: '/wms/stockTransfer/print/index'
+      }
+      return map[domainType] || '/wms/purchaseOrder/print/index'
+    },
+    buildGenericResultCard(domainType, data, options = {}) {
+      const billNo = data[options.billNoKey || 'billNo'] || ''
+      const partner = options.partnerFormatter ? options.partnerFormatter(data) : (options.partnerKey ? data[options.partnerKey] : '')
+      const warehouse = options.warehouseFormatter ? options.warehouseFormatter(data) : (options.warehouseKey ? data[options.warehouseKey] : '')
+      // 处理日期字段，将LocalDate转换为字符串格式
+      const formatDate = (date) => {
+        if (!date) return ''
+        if (typeof date === 'string') return date
+        if (typeof date === 'object' && date.toString) {
+          const str = date.toString()
+          return str.split('T')[0] || ''
+        }
+        return ''
+      }
+      console.log('buildGenericResultCard:', domainType, 'data.items:', data.items)
+      return {
+        type: 'EXEC_RESULT',
+        domainType,
+        id: data.id,
+        billNo,
+        orderNo: data.orderNo,
+        partner,
+        supplierName: options.supplierNameKey ? data[options.supplierNameKey] : undefined,
+        customerName: options.customerNameKey ? data[options.customerNameKey] : undefined,
+        warehouse,
+        checkType: options.checkTypeKey ? data[options.checkTypeKey] : undefined,
+        orderDate: options.dateKey ? formatDate(data[options.dateKey]) : undefined,
+        orderStatus: options.statusKey ? data[options.statusKey] : undefined,
+        totalAmount: data.totalAmount,
+        sourceNo: options.sourceKey ? data[options.sourceKey] : undefined,
+        items: Array.isArray(data.items)
+          ? data.items.map(item => ({
+            goods: item.goodsName,
+            sku: item.skuName,
+            unit: item.unitName,
+            beforeQty: options.beforeQtyKey ? item[options.beforeQtyKey] : item.beforeQty,
+            quantity: options.quantityKey ? item[options.quantityKey] : (item.quantity || item.checkQty),
+            price: options.priceKey ? item[options.priceKey] : item.price,
+            amount: options.amountKey ? item[options.amountKey] : item.amount
+          }))
+          : []
+      }
+    },
+    async fetchResultCardData(domainType, id) {
+      if (!id) return null
+      if (['PURCHASE_ORDER', 'PO'].includes(domainType)) {
+        const resp = await getPurchaseOrder(id)
+        return this.buildExecResultCard(resp.data || {})
+      }
+      if (domainType === 'PURCHASE_IN') {
+        const resp = await getPurchaseIn(id)
+        const data = resp.data || {}
+        return this.buildGenericResultCard('PURCHASE_IN', data, {
+          billNoKey: 'inNo', partnerKey: 'supplierName', supplierNameKey: 'supplierName', warehouseKey: 'warehouseName', dateKey: 'inDate', statusKey: 'approveStatus', sourceKey: 'orderNo'
+        })
+      }
+      if (domainType === 'PURCHASE_RETURN') {
+        const resp = await getPurchaseReturn(id)
+        console.log('PURCHASE_RETURN resp:', resp)
+        return this.buildGenericResultCard('PURCHASE_RETURN', resp.data || {}, {
+          billNoKey: 'returnNo', partnerKey: 'supplierName', supplierNameKey: 'supplierName', warehouseKey: 'warehouseName', dateKey: 'returnDate', statusKey: 'approveStatus', sourceKey: 'inNo'
+        })
+      }
+      if (domainType === 'SALES_ORDER') {
+        const resp = await getSalesOrder(id)
+        return this.buildGenericResultCard('SALES_ORDER', resp.data || {}, {
+          billNoKey: 'orderNo', partnerKey: 'customerName', customerNameKey: 'customerName', dateKey: 'orderDate', statusKey: 'orderStatus'
+        })
+      }
+      if (domainType === 'SALES_OUT') {
+        const resp = await getSalesOut(id)
+        return this.buildGenericResultCard('SALES_OUT', resp.data || {}, {
+          billNoKey: 'outNo', partnerKey: 'customerName', customerNameKey: 'customerName', warehouseKey: 'warehouseName', dateKey: 'outDate', statusKey: 'approveStatus', sourceKey: 'orderNo'
+        })
+      }
+      if (domainType === 'SALES_RETURN') {
+        const resp = await getSalesReturn(id)
+        return this.buildGenericResultCard('SALES_RETURN', resp.data || {}, {
+          billNoKey: 'returnNo', partnerKey: 'customerName', customerNameKey: 'customerName', warehouseKey: 'warehouseName', dateKey: 'returnDate', statusKey: 'approveStatus', sourceKey: 'outNo'
+        })
+      }
+      if (domainType === 'STOCK_CHECK') {
+        const resp = await getStockCheck(id)
+        return this.buildGenericResultCard('STOCK_CHECK', resp.data || {}, {
+          billNoKey: 'checkNo', partnerKey: 'warehouseName', warehouseKey: 'warehouseName', checkTypeKey: 'checkType', dateKey: 'checkDate', statusKey: 'checkStatus', quantityKey: 'checkQty', amountKey: 'diffAmount', priceKey: 'costPrice', beforeQtyKey: 'beforeQty'
+        })
+      }
+      if (domainType === 'STOCK_TRANSFER') {
+        const resp = await getStockTransfer(id)
+        return this.buildGenericResultCard('STOCK_TRANSFER', resp.data || {}, {
+          billNoKey: 'transferNo', partnerFormatter: data => `${data.outWarehouseName || '-'} -> ${data.inWarehouseName || '-'}`.trim(), warehouseFormatter: data => `${data.outWarehouseName || '-'} -> ${data.inWarehouseName || '-'}`.trim(), dateKey: 'transferDate', statusKey: 'transferStatus'
+        })
+      }
+      return null
+    },
+    async approveResultByDomain(card) {
+      if (['PURCHASE_ORDER', 'PO'].includes(card.domainType)) return approvePurchaseOrder(card.id)
+      if (card.domainType === 'PURCHASE_IN') return approvePurchaseIn(card.id)
+      if (card.domainType === 'PURCHASE_RETURN') return approvePurchaseReturn(card.id)
+      if (card.domainType === 'SALES_ORDER') return approveSalesOrder(card.id)
+      if (card.domainType === 'SALES_OUT') return approveSalesOut(card.id)
+      if (card.domainType === 'SALES_RETURN') return approveSalesReturn(card.id)
+      if (card.domainType === 'STOCK_CHECK') return approveStockCheck(card.id)
+      if (card.domainType === 'STOCK_TRANSFER') return approveStockTransfer(card.id)
+    },
+    async deleteResultByDomain(card) {
+      if (['PURCHASE_ORDER', 'PO'].includes(card.domainType)) return delPurchaseOrder(card.id)
+      if (card.domainType === 'PURCHASE_IN') return delPurchaseIn(card.id)
+      if (card.domainType === 'PURCHASE_RETURN') return delPurchaseReturn(card.id)
+      if (card.domainType === 'SALES_ORDER') return delSalesOrder(card.id)
+      if (card.domainType === 'SALES_OUT') return delSalesOut(card.id)
+      if (card.domainType === 'SALES_RETURN') return delSalesReturn(card.id)
+      if (card.domainType === 'STOCK_CHECK') return delStockCheck(card.id)
+      if (card.domainType === 'STOCK_TRANSFER') return delStockTransfer(card.id)
+    },
+    pretty(v) {
+      return JSON.stringify(v, null, 2)
+    },
+    async startNewConversation() {
+      const startResp = await startPcPurchaseOrderChat()
+      const data = startResp.data || {}
+      this.conversationId = data.conversationId || ''
+      this.activeConversationId = this.conversationId
+      this.messages = []
+      this.quickActions = []
+      this.context = {}
+      this.candidateSelectionCache = { goods: [] }
+      this.showNewMessageHint = false
+      this.pushAssistant(data)
+      this.syncConversationSnapshot()
+    },
+    restoreConversations() {
+      const raw = window.localStorage.getItem(this.storageKey)
+      if (!raw) {
+        this.conversations = []
+        return
+      }
+      try {
+        const parsed = JSON.parse(raw)
+        this.conversations = Array.isArray(parsed)
+          ? parsed.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+          : []
+      } catch (e) {
+        this.conversations = []
+      }
+    },
+    persistConversations() {
+      window.localStorage.setItem(this.storageKey, JSON.stringify(this.conversations))
+    },
+    activateConversation(conversationId) {
+      const current = this.conversations.find(item => item.conversationId === conversationId)
+      if (!current) return
+      this.activeConversationId = current.conversationId
+      this.conversationId = current.conversationId
+      this.messages = current.messages || []
+      this.quickActions = current.quickActions || []
+      this.context = current.context || {}
+      this.candidateSelectionCache = current.candidateSelectionCache || { goods: [] }
+      this.draft = ''
+      this.showNewMessageHint = false
+      this.$nextTick(this.scrollBottom)
+    },
+    deriveConversationTitle() {
+      if (this.context && this.context.domainType) {
+        // 标题只保留动作名称，避免出现“采购退货：采购订单”这类冗余后缀。
+        return this.formatDomainType(this.context.domainType)
+      }
+      const firstUser = this.messages.find(item => item.role === 'user' && item.text)
+      const fallback = this.messages.find(item => item.role === 'assistant' && item.text)
+      const source = firstUser ? firstUser.text : (fallback ? fallback.text : '新对话')
+      return (source || '新对话').replace(/\s+/g, ' ').slice(0, 18)
+    },
+    cancelPreviewCreate(msg) {
+      this.send('取消', '取消')
+    },
+    deriveConversationSummary() {
+      const last = this.messages[this.messages.length - 1]
+      return last && last.text ? last.text.replace(/\s+/g, ' ').slice(0, 28) : ''
+    },
+    syncConversationSnapshot() {
+      if (!this.conversationId) return
+      const snapshot = {
+        conversationId: this.conversationId,
+        title: this.deriveConversationTitle(),
+        summary: this.deriveConversationSummary(),
+        updatedAt: Date.now(),
+        messages: this.messages,
+        quickActions: this.quickActions,
+        context: this.context,
+        candidateSelectionCache: this.candidateSelectionCache
+      }
+      const index = this.conversations.findIndex(item => item.conversationId === this.conversationId)
+      if (index >= 0) {
+        this.conversations.splice(index, 1, snapshot)
+      } else {
+        this.conversations.unshift(snapshot)
+      }
+      this.conversations = this.conversations.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+      this.activeConversationId = this.conversationId
+      this.persistConversations()
+    },
+    afterMessagePushed(role) {
+      this.syncConversationSnapshot()
+      this.$nextTick(() => {
+        if (role === 'user' || this.isNearBottom) {
+          this.scrollBottom()
+          return
+        }
+        this.showNewMessageHint = true
+      })
+    },
+    async pushAssistant(data) {
+      if (!data) return
+      this.conversationId = data.conversationId || this.conversationId
+      this.quickActions = data.quickActions || []
+      this.context = data.context || {}
+      if (this.context.step !== 'WAIT_GOODS_CANDIDATE') {
+        this.candidateSelectionCache = { goods: [] }
+      }
+      const card = data.card || null
+      console.log('pushAssistant card:', card)
+      this.prepareCard(card)
+      if (card && card.type === 'EXEC_RESULT') {
+        this.lockEditablePreviewCards()
+        await this.hydrateExecResultCard(card)
+      }
+      this.messages.push({
+        role: 'assistant',
+        text: data.text,
+        card
+      })
+      this.afterMessagePushed('assistant')
+    },
+    pushUser(text) {
+      this.messages.push({ role: 'user', text })
+      this.afterMessagePushed('user')
+    },
+    scrollBottom() {
+      const el = this.$refs.chatList
+      if (el) {
+        el.scrollTop = el.scrollHeight
+        this.isNearBottom = true
+        this.showNewMessageHint = false
+      }
+    },
+    jumpToLatest() {
+      this.scrollBottom()
+    },
+    handleChatScroll() {
+      const el = this.$refs.chatList
+      if (!el) return
+      const distance = el.scrollHeight - el.scrollTop - el.clientHeight
+      this.isNearBottom = distance < 48
+      if (this.isNearBottom) {
+        this.showNewMessageHint = false
+      }
+    },
+    handleComposerKeydown(event) {
+      if (this.chatLocked) {
+        return
+      }
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault()
+        this.send()
+      }
+    },
+    async send(text, displayText) {
+      const message = (text || this.draft || '').trim()
+      if (!message || this.sending || (this.chatLocked && !text)) return
+      this.pushUser((displayText || message).trim())
+      this.draft = ''
+      this.sending = true
+      try {
+        const resp = await chatPcPurchaseOrder({
+          conversationId: this.conversationId,
+          message
+        })
+        this.pushAssistant(resp.data)
+      } catch (error) {
+        const backendMessage = error && error.response && error.response.data
+          ? (error.response.data.msg || error.response.data.message || error.response.data.error)
+          : ''
+        this.pushAssistant({
+          conversationId: this.conversationId,
+          text: backendMessage || (error && error.message) || '本次请求失败，请稍后重试。',
+          quickActions: this.quickActions,
+          context: this.context
+        })
+      } finally {
+        this.sending = false
+      }
+    },
+    prepareCard(card) {
+      if (!card) return
+      if (card.type === 'CANDIDATE' && card.selectionMode === 'single-list') {
+        this.$set(card, 'selectedValue', '')
+        this.$set(card, 'searchKeyword', card.searchKeyword || '')
+        return
+      }
+      if (this.isMultiCandidateCard(card)) {
+        this.$set(card, 'selectedSkuIds', this.getCachedCandidateSelections(card))
+        return
+      }
+      if (card.type === 'REQUIRED_FORM') {
+        const model = {}
+        ;(card.fields || []).forEach(field => {
+          model[field.key] = field.defaultValue !== undefined && field.defaultValue !== null ? field.defaultValue : ''
+        })
+        this.$set(card, 'formModel', model)
+        return
+      }
+      if (card.type === 'GOODS_CREATE_FORM') {
+        this.$set(card, 'formModel', {
+          goodsName: (card.formModel && card.formModel.goodsName) || '',
+          unitName: (card.formModel && card.formModel.unitName) || '',
+          categoryId: card.formModel && card.formModel.categoryId,
+          categoryName: (card.formModel && card.formModel.categoryName) || ''
+        })
+        return
+      }
+      if (card.type === 'GOODS_SPEC_FORM') {
+        this.$set(card, 'formModel', {
+          goodsName: (card.formModel && card.formModel.goodsName) || '',
+          unitName: (card.formModel && card.formModel.unitName) || '',
+          specs: this.normalizeSpecRows(card.formModel && card.formModel.specs)
+        })
+        return
+      }
+      if (card.type === 'GOODS_SKU_FORM') {
+        this.$set(card, 'formModel', {
+          goodsName: (card.formModel && card.formModel.goodsName) || '',
+          unitName: (card.formModel && card.formModel.unitName) || '',
+          skuList: this.normalizeSkuRows(card.formModel && card.formModel.skuList)
+        })
+        return
+      }
+      if (card.type === 'DIFF_PREVIEW' && card.editable) {
+        this.$set(card, 'formModel', {
+          supplierId: card.formModel && card.formModel.supplierId !== undefined ? card.formModel.supplierId : (card.supplierId || null),
+          warehouseId: card.formModel && card.formModel.warehouseId !== undefined ? card.formModel.warehouseId : (card.warehouseId || null),
+          customerId: card.formModel && card.formModel.customerId !== undefined ? card.formModel.customerId : (card.customerId || null),
+          items: this.normalizePreviewRows(card.formModel && card.formModel.items)
+        })
+      }
+    },
+    lockEditablePreviewCards() {
+      this.messages.forEach(msg => {
+        if (msg && msg.card && msg.card.type === 'DIFF_PREVIEW' && msg.card.editable) {
+          this.$set(msg.card, 'editable', false)
+          this.$set(msg.card, 'items', this.normalizePreviewRows((msg.card.formModel && msg.card.formModel.items) || msg.card.items || []))
+        }
+      })
+    },
+    async hydrateExecResultCard(card) {
+      if (!card || !card.id || !card.domainType) return
+      const needsHydrate = !Array.isArray(card.items) || !card.items.length || ['PURCHASE_RETURN', 'STOCK_CHECK', 'STOCK_TRANSFER'].includes(card.domainType)
+      console.log('hydrateExecResultCard:', card.domainType, 'needsHydrate:', needsHydrate, 'items:', card.items)
+      if (!needsHydrate) return
+      try {
+        const freshCard = await this.fetchResultCardData(card.domainType, card.id)
+        console.log('freshCard:', freshCard)
+        if (!freshCard) return
+        Object.keys(freshCard).forEach(key => {
+          this.$set(card, key, freshCard[key])
+        })
+        this.syncConversationSnapshot()
+      } catch (error) {
+        console.error('hydrateExecResultCard error:', error)
+      }
+    },
+    createSpecRow() {
+      return {
+        specName: '',
+        values: [{ specValue: '' }]
+      }
+    },
+    normalizeSpecRows(specs) {
+      if (!Array.isArray(specs) || !specs.length) {
+        return [this.createSpecRow()]
+      }
+      return specs.map(spec => ({
+        specName: spec.specName || '',
+        values: Array.isArray(spec.values) && spec.values.length
+          ? spec.values.map(value => ({ specValue: value.specValue || '' }))
+          : [{ specValue: '' }]
+      }))
+    },
+    normalizeSkuRows(skuList) {
+      if (!Array.isArray(skuList)) return []
+      return skuList.map(row => ({
+        skuName: row.skuName || '',
+        specInfo: row.specInfo || '',
+        unitName: row.unitName || '',
+        quantity: this.normalizeDecimalInput(row.quantity),
+        price: this.normalizeDecimalInput(row.price)
+      }))
+    },
+    normalizePreviewRows(items) {
+      if (!Array.isArray(items)) return []
+      return items.map(row => ({
+        sourceLineId: row.sourceLineId,
+        skuId: row.skuId,
+        goods: row.goods || '',
+        sku: row.sku || '',
+        unit: row.unit || '',
+        orderQuantity: this.normalizeDecimalInput(row.orderQuantity),
+        receivedQty: this.normalizeDecimalInput(row.receivedQty),
+        quantity: this.normalizeDecimalInput(row.quantity),
+        price: this.normalizeDecimalInput(row.price),
+        beforeQty: this.normalizeDecimalInput(row.beforeQty),
+        maxQty: this.normalizeDecimalInput(row.maxQty)
+      }))
+    },
+    async addInlinePreviewSupplier(msg) {
+      try {
+        const { value } = await this.$prompt('请输入供应商名称', '新增供应商', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          inputPattern: /\S+/,
+          inputErrorMessage: '供应商名称不能为空'
+        })
+        const supplierName = String(value || '').trim()
+        if (!supplierName) {
+          return
+        }
+        await addSupplier({
+          supplierName,
+          status: '0',
+          settlementType: '1',
+          creditLimit: 0,
+          paymentDays: 0
+        })
+        await this.initializeSupplierOptions()
+        const created = (this.supplierOptions || [])
+          .filter(item => item.supplierName === supplierName)
+          .sort((left, right) => Number(right.id || 0) - Number(left.id || 0))[0]
+        if (msg && msg.card && msg.card.formModel && created) {
+          this.$set(msg.card.formModel, 'supplierId', created.id)
+          this.$set(msg.card, 'supplier', created.supplierName)
+        }
+        this.$message.success('供应商已新增')
+      } catch (error) {
+        if (error !== 'cancel') {
+          throw error
+        }
+      }
+    },
+    async addInlinePreviewWarehouse(msg) {
+      try {
+        const { value } = await this.$prompt('请输入仓库名称', '新增仓库', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          inputPattern: /\S+/,
+          inputErrorMessage: '仓库名称不能为空'
+        })
+        const warehouseName = String(value || '').trim()
+        if (!warehouseName) {
+          return
+        }
+        await addWarehouse({
+          warehouseName,
+          status: '0',
+          sortNum: 0,
+          remark: 'PC-AI助手快捷新增'
+        })
+        await this.initializeWarehouseOptions()
+        const created = (this.warehouseOptions || [])
+          .filter(item => item.warehouseName === warehouseName)
+          .sort((left, right) => Number(right.id || 0) - Number(left.id || 0))[0]
+        if (msg && msg.card && msg.card.formModel && created) {
+          this.$set(msg.card.formModel, 'warehouseId', created.id)
+          this.$set(msg.card, 'warehouse', created.warehouseName)
+        }
+        this.$message.success('仓库已新增')
+      } catch (error) {
+        if (error !== 'cancel') {
+          throw error
+        }
+      }
+    },
+    async addInlinePreviewCustomer(msg) {
+      try {
+        const { value } = await this.$prompt('请输入客户名称', '新增客户', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          inputPattern: /\S+/,
+          inputErrorMessage: '客户名称不能为空'
+        })
+        const customerName = String(value || '').trim()
+        if (!customerName) {
+          return
+        }
+        await addCustomer({
+          customerName,
+          status: '0',
+          remark: 'PC-AI助手快捷新增'
+        })
+        await this.initializeCustomerOptions()
+        const created = (this.customerOptions || [])
+          .filter(item => item.customerName === customerName)
+          .sort((left, right) => Number(right.id || 0) - Number(left.id || 0))[0]
+        if (msg && msg.card && msg.card.formModel && created) {
+          this.$set(msg.card.formModel, 'customerId', created.id)
+          this.$set(msg.card, 'customer', created.customerName)
+        }
+        this.$message.success('客户已新增')
+      } catch (error) {
+        if (error !== 'cancel') {
+          throw error
+        }
+      }
+    },
+    async addOrderFormSupplier() {
+      try {
+        const { value } = await this.$prompt('请输入供应商名称', '新增供应商', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          inputPattern: /\S+/,
+          inputErrorMessage: '供应商名称不能为空'
+        })
+        const supplierName = String(value || '').trim()
+        if (!supplierName) {
+          return
+        }
+        await addSupplier({
+          supplierName,
+          status: '0',
+          settlementType: '1',
+          creditLimit: 0,
+          paymentDays: 0
+        })
+        await this.initializeSupplierOptions()
+        const created = (this.supplierOptions || [])
+          .filter(item => item.supplierName === supplierName)
+          .sort((left, right) => Number(right.id || 0) - Number(left.id || 0))[0]
+        if (created) {
+          this.$set(this.orderForm, 'supplierId', created.id)
+        }
+        this.$message.success('供应商已新增')
+      } catch (error) {
+        if (error !== 'cancel') {
+          throw error
+        }
+      }
+    },
+    async addOrderFormWarehouse() {
+      try {
+        const { value } = await this.$prompt('请输入仓库名称', '新增仓库', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          inputPattern: /\S+/,
+          inputErrorMessage: '仓库名称不能为空'
+        })
+        const warehouseName = String(value || '').trim()
+        if (!warehouseName) {
+          return
+        }
+        await addWarehouse({
+          warehouseName,
+          status: '0',
+          sortNum: 0,
+          remark: 'PC-AI助手快捷新增'
+        })
+        await this.initializeWarehouseOptions()
+        const created = (this.warehouseOptions || [])
+          .filter(item => item.warehouseName === warehouseName)
+          .sort((left, right) => Number(right.id || 0) - Number(left.id || 0))[0]
+        if (created) {
+          this.$set(this.orderForm, 'warehouseId', created.id)
+        }
+        this.$message.success('仓库已新增')
+      } catch (error) {
+        if (error !== 'cancel') {
+          throw error
+        }
+      }
+    },
+    async addOrderFormCustomer() {
+      try {
+        const { value } = await this.$prompt('请输入客户名称', '新增客户', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          inputPattern: /\S+/,
+          inputErrorMessage: '客户名称不能为空'
+        })
+        const customerName = String(value || '').trim()
+        if (!customerName) {
+          return
+        }
+        await addCustomer({
+          customerName,
+          status: '0',
+          remark: 'PC-AI助手快捷新增'
+        })
+        await this.initializeCustomerOptions()
+        const created = (this.customerOptions || [])
+          .filter(item => item.customerName === customerName)
+          .sort((left, right) => Number(right.id || 0) - Number(left.id || 0))[0]
+        if (created) {
+          this.$set(this.orderForm, 'customerId', created.id)
+        }
+        this.$message.success('客户已新增')
+      } catch (error) {
+        if (error !== 'cancel') {
+          throw error
+        }
+      }
+    },
+    addSpecRow(msg) {
+      msg.card.formModel.specs.push(this.createSpecRow())
+    },
+    removeSpecRow(msg, specIndex) {
+      if (msg.card.formModel.specs.length === 1) {
+        msg.card.formModel.specs.splice(0, 1, this.createSpecRow())
+        return
+      }
+      msg.card.formModel.specs.splice(specIndex, 1)
+    },
+    addSpecValue(msg, specIndex) {
+      msg.card.formModel.specs[specIndex].values.push({ specValue: '' })
+    },
+    removeSpecValue(msg, specIndex, valueIndex) {
+      const values = msg.card.formModel.specs[specIndex].values
+      if (values.length === 1) {
+        values.splice(0, 1, { specValue: '' })
+        return
+      }
+      values.splice(valueIndex, 1)
+    },
+    removeSkuRow(msg, skuIndex) {
+      if (!msg || !msg.card || !msg.card.formModel || !Array.isArray(msg.card.formModel.skuList)) return
+      msg.card.formModel.skuList.splice(skuIndex, 1)
+    },
+    removePreviewRow(msg, rowIndex) {
+      if (!msg || !msg.card || !msg.card.formModel || !Array.isArray(msg.card.formModel.items)) return
+      msg.card.formModel.items.splice(rowIndex, 1)
+    },
+    getFormFieldOptions(field) {
+      if (!field) return []
+      if (Array.isArray(field.options) && field.options.length) {
+        return field.options.map(option => ({
+          label: option.label || option.name || option.text || option.value,
+          value: option.value
+        }))
+      }
+      if (field.key === 'supplierId') {
+        return (this.supplierOptions || []).map(item => ({
+          label: item.supplierName,
+          value: item.id
+        }))
+      }
+      if (field.key === 'customerId') {
+        return (this.customerOptions || []).map(item => ({
+          label: item.customerName,
+          value: item.id
+        }))
+      }
+      if (field.key === 'warehouseId') {
+        return (this.warehouseOptions || []).map(item => ({
+          label: item.warehouseName,
+          value: item.id
+        }))
+      }
+      if (field.key === 'orderId') {
+        return (this.approvedOrderOptions || []).map(item => ({
+          label: item.orderNo,
+          value: item.id
+        }))
+      }
+      return []
+    },
+    handlePreviewNumberInput(row, field, value) {
+      if (!row) return
+      let nextValue = this.normalizeDecimalInput(value)
+      if (field === 'quantity') {
+        const quantity = Number(nextValue)
+        const maxQty = row.maxQty === '' || row.maxQty === null || row.maxQty === undefined ? null : Number(row.maxQty)
+        if (maxQty !== null && !Number.isNaN(maxQty) && !Number.isNaN(quantity) && quantity > maxQty) {
+          nextValue = this.normalizeDecimalInput(maxQty)
+        }
+      }
+      row[field] = nextValue
+    },
+    previewRowAmount(row) {
+      if (!row) return null
+      const quantity = Number(row.quantity)
+      const price = Number(row.price)
+      if (Number.isNaN(quantity) || Number.isNaN(price)) {
+        return row.amount
+      }
+      return quantity * price
+    },
+    formatSpecDisplay(specInfo) {
+      if (!specInfo) return '无规格'
+      try {
+        const parsed = typeof specInfo === 'string' ? JSON.parse(specInfo) : specInfo
+        return Object.keys(parsed || {}).map(key => `${key}:${parsed[key]}`).join(' / ') || '无规格'
+      } catch (error) {
+        return specInfo
+      }
+    },
+    async submitForm(msg, submitAction = 'SUBMIT', options = {}) {
+      if (!msg || !msg.card || !msg.card.formModel) return
+      if (msg.card.type === 'REQUIRED_FORM') {
+        const fields = msg.card.fields || []
+        const missingField = fields.find(field => {
+          if (!field.required) return false
+          const value = msg.card.formModel[field.key]
+          return value === '' || value === null || value === undefined
+        })
+        if (missingField) {
+          this.$message.warning(`请先填写${missingField.label}`)
+          return
+        }
+      }
+      if (msg.card.type === 'GOODS_CREATE_FORM' && !msg.card.formModel.categoryId) {
+        this.$message.warning('请选择商品分类')
+        return
+      }
+      if (msg.card.type === 'DIFF_PREVIEW' && msg.card.editable) {
+        const items = msg.card.formModel.items || []
+        if (msg.card.allowSupplierEdit && !msg.card.formModel.supplierId) {
+          this.$message.warning('请先选择或新增供应商')
+          return
+        }
+        if (msg.card.allowCustomerEdit && !msg.card.formModel.customerId) {
+          this.$message.warning('请先选择或新增客户')
+          return
+        }
+        if (msg.card.allowWarehouseEdit && !msg.card.formModel.warehouseId) {
+          this.$message.warning('请先选择或新增仓库')
+          return
+        }
+        if (!items.length) {
+          this.$message.warning(msg.card.domainType === 'STOCK_CHECK' ? '盘点单至少保留一条商品明细' : '关联单模式至少保留一条来源明细')
+          return
+        }
+        const invalidRow = items.find(row => {
+          const quantity = Number(row.quantity)
+          const maxQty = row.maxQty === '' || row.maxQty === null || row.maxQty === undefined ? null : Number(row.maxQty)
+          const price = row.price === '' || row.price === null || row.price === undefined ? null : Number(row.price)
+          if (msg.card.domainType === 'STOCK_CHECK') {
+            return Number.isNaN(quantity) || quantity < 0
+          }
+          if (msg.card.allowPriceEdit && msg.card.priceRequired !== false && (price === null || Number.isNaN(price) || price <= 0)) {
+            return true
+          }
+          return Number.isNaN(quantity) || quantity <= 0 || (maxQty !== null && !Number.isNaN(maxQty) && quantity > maxQty)
+        })
+        if (invalidRow) {
+          if (msg.card.domainType === 'STOCK_CHECK') {
+            this.$message.warning('实际数量不能小于0')
+          } else if (msg.card.allowPriceEdit) {
+            this.$message.warning('数量和单价都必须大于0')
+          } else {
+            this.$message.warning('数量必须大于0，且不能超过来源单可用上限')
+          }
+          return
+        }
+      }
+      if (msg.card.type === 'GOODS_SKU_FORM') {
+        const skuList = msg.card.formModel.skuList || []
+        if (!skuList.length) {
+          this.$message.warning('请至少保留一条 SKU')
+          return
+        }
+        const invalidRow = skuList.find(row => {
+          const quantity = Number(row.quantity)
+          const price = Number(row.price)
+          return !row.skuName || Number.isNaN(quantity) || Number.isNaN(price) || quantity <= 0 || price <= 0
+        })
+        if (invalidRow) {
+          this.$message.warning('SKU名称、数量和采购单价都必须填写且大于0')
+          return
+        }
+      }
+      if (options.confirmMessage) {
+        try {
+          await this.$confirm(options.confirmMessage, '提示', {
+            confirmButtonText: '继续',
+            cancelButtonText: '取消',
+            type: 'warning'
+          })
+        } catch (error) {
+          return
+        }
+      }
+      const payloadData = JSON.parse(JSON.stringify(msg.card.formModel))
+      payloadData._submitAction = submitAction
+      const payload = '__FORM__' + JSON.stringify(payloadData)
+      await this.send(payload, options.displayText || '已提交表单')
+    },
+    async confirmPreviewAndCreate(msg) {
+      await this.submitForm(msg, 'CONFIRM_EXEC', { displayText: '确认并保存单据' })
+    },
+    async submitPreviewAndContinue(msg) {
+      if (!msg || !msg.card || !msg.card.nextAction) return
+      await this.submitForm(msg, 'UPDATE_PREVIEW', { displayText: '已更新商品确认' })
+      await this.send(msg.card.nextAction, msg.card.nextLabel || '下一步')
+    },
+    handleSelectOrderSku(index) {
+      this.currentOrderItemIndex = index !== undefined ? index : -1
+      this.$refs.skuSelector.open()
+    },
+    handleOrderSkuSelected(selectedSkus) {
+      if (!Array.isArray(selectedSkus) || !selectedSkus.length) return
+      if (this.currentOrderItemIndex >= 0) {
+        const sku = selectedSkus[0]
+        this.$set(this.orderForm.items, this.currentOrderItemIndex, {
+          skuId: sku.id,
+          skuCode: sku.skuCode,
+          goodsName: sku.goodsName,
+          skuName: sku.skuName,
+          specInfo: sku.specInfo || '无规格',
+          unitName: sku.unitName || '个',
+          quantity: 1,
+          price: sku.purchasePrice || 0,
+          discount: 0,
+          amount: sku.purchasePrice || 0,
+          remark: null
+        })
+      } else {
+        selectedSkus.forEach(sku => {
+          this.orderForm.items.push({
+            skuId: sku.id,
+            skuCode: sku.skuCode,
+            goodsName: sku.goodsName,
+            skuName: sku.skuName,
+            specInfo: sku.specInfo || '无规格',
+            unitName: sku.unitName || '个',
+            quantity: 1,
+            price: sku.purchasePrice || 0,
+            discount: 0,
+            amount: sku.purchasePrice || 0,
+            remark: null
+          })
+        })
+      }
+      this.currentOrderItemIndex = -1
+      this.orderForm.items.forEach(row => this.handleOrderItemChange(row))
+    },
+    handleDeleteOrderItem(index) {
+      this.orderForm.items.splice(index, 1)
+    },
+    canEditOrderItems() {
+      if (this.orderFormView) {
+        return false
+      }
+      return String(this.orderForm.approveStatus || this.orderForm.orderStatus || this.orderForm.checkStatus || this.orderForm.transferStatus || '0') === '0'
+    },
+    canAddOrderItems() {
+      return this.canEditOrderItems() && Number(this.orderForm.sourceType || 1) !== 2
+    },
+    handleOrderItemChange(row) {
+      row.amount = Number(row.quantity || 0) * Number(row.price || 0) - Number(row.discount || 0)
+    },
+    handleOrderChangeForIn(orderId) {
+      if (!orderId) {
+        this.orderForm.supplierId = null
+        this.orderForm.items = []
+        return
+      }
+
+      // 获取订单详情
+      getPurchaseOrder(orderId).then(response => {
+        const order = response.data
+        this.orderForm.supplierId = order.supplierId
+
+        // 获取订单商品明细
+        getOrderItems(orderId).then(itemResponse => {
+          const items = itemResponse.data
+          this.orderForm.items = items.map(item => {
+            const orderQty = item.quantity || 0              // 订单数量
+            const receivedQty = item.receivedQty || 0        // 已入库数量（后端返回）
+            const availableQty = orderQty - receivedQty      // 可入库数量 = 订单数量 - 已入库数量
+            return {
+              skuId: item.skuId,
+              skuCode: item.skuCode,
+              goodsName: item.goodsName,
+              skuName: item.skuName,
+              specInfo: item.specInfo,
+              unitName: item.unitName,
+              quantity: availableQty,
+              price: item.price || 0,
+              discount: 0,
+              amount: Number(availableQty) * Number(item.price || 0)
+            }
+          })
+        })
+      })
+    },
+    getOrderSummaries(param) {
+      const { columns, data } = param
+      const sums = []
+      columns.forEach((column, index) => {
+        if (index === 0) {
+          sums[index] = '合计'
+          return
+        }
+        if (column.property === 'quantity') {
+          sums[index] = data.reduce((sum, row) => sum + Number(row.quantity || 0), 0)
+        } else if (column.property === 'amount') {
+          sums[index] = data.reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2)
+        } else {
+          sums[index] = ''
+        }
+      })
+      return sums
+    },
+    toggleOrderDialogFullscreen() {
+      this.orderDialogFullscreen = !this.orderDialogFullscreen
+    },
+    submitOrderForm() {
+      this.$refs.orderForm.validate(async valid => {
+        if (!valid) return
+        if (!this.orderForm.items.length) {
+          this.$modal.msgError('请添加订单明细')
+          return
+        }
+        // 根据单据类型选择更新API
+        if (this.orderForm.domainType === 'PURCHASE_IN') {
+          await updatePurchaseIn(this.orderForm)
+        } else if (this.orderForm.domainType === 'PURCHASE_RETURN') {
+          await updatePurchaseReturn(this.orderForm)
+        } else if (this.orderForm.domainType === 'SALES_ORDER') {
+          await updateSalesOrder(this.orderForm)
+        } else {
+          await updatePurchaseOrder(this.orderForm)
+        }
+        this.$modal.msgSuccess('修改成功')
+        const msg = this.messages[this.currentOrderMessageIndex]
+        if (msg) {
+          await this.refreshResultOrderCard(msg)
+        }
+        this.closeOrderDialog()
+      })
+    },
+    async clearContext() {
+      if (!this.conversationId) return
+      await clearPcPurchaseOrderContext(this.conversationId)
+      this.messages = []
+      this.quickActions = []
+      this.context = {}
+      this.candidateSelectionCache = { goods: [] }
+      this.syncConversationSnapshot()
+      await this.startNewConversation()
+    },
+    async runScenario(mode) {
+      if (this.sending || this.scenarioRunning) return
+      const cases = {
+        PO_FULL: [
+          '创建采购订单，供应商云腾科技，苹果笔记本,2,6800；无线鼠标,10,59',
+          '确认'
+        ],
+        PI_FULL: [
+          '创建采购入库，仓库A仓，供应商云腾科技，苹果笔记本,1,6800',
+          '确认'
+        ],
+        QUERY: ['查询采购订单']
+      }
+      const steps = cases[mode] || []
+      if (!steps.length) return
+
+      this.scenarioRunning = true
+      try {
+        for (const step of steps) {
+          await this.send(step)
+          await this.sleep(180)
+        }
+      } finally {
+        this.scenarioRunning = false
+      }
+    },
+    sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms))
+    },
+    formatRelativeTime(time) {
+      if (!time) return '-'
+      const diff = Date.now() - time
+      if (diff < 60 * 1000) return '刚刚'
+      if (diff < 60 * 60 * 1000) return `${Math.floor(diff / (60 * 1000))} 分钟前`
+      if (diff < 24 * 60 * 60 * 1000) return `${Math.floor(diff / (60 * 60 * 1000))} 小时前`
+      return `${Math.floor(diff / (24 * 60 * 60 * 1000))} 天前`
+    }
+  }
+}
+</script>
+
+<style lang="scss" scoped>
+@import './index.scss';
+</style>
