@@ -417,6 +417,11 @@ class PcItemParseSupport {
             }
             String[] arr = segment.trim().split(",");
             if (arr.length < 2) {
+                // 不含逗号的纯文字段（如“帮我开一张采购订单”“向牛飞冷链采购”）不是结构化条目，
+                // 跳过而不是放弃整条结构化解析；含逗号但格式坏的段仍按原逻辑整体放弃。
+                if (!segment.contains(",")) {
+                    continue;
+                }
                 return new ArrayList<>();
             }
             try {

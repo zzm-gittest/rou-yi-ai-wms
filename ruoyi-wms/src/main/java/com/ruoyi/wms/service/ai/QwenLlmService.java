@@ -11,8 +11,13 @@ import org.springframework.stereotype.Service;
 /**
  * 通义千问大语言模型服务（保持原有 public API；底层委托给 {@link LlmClient} SPI）。
  *
- * <p>{@code LlmClient} = {@code SaasYmlLlmClient}，直接读取 yml 配置调用 DashScope，
- * 行为完全等价于历史版本。</p>
+ * <p>历史版本直接读取 yml 中的 qwen.api-key 调 DashScope；
+ * 重构后变成 SPI 的薄包装：</p>
+ * <ul>
+ *   <li>SaaS 模式（默认）：{@code LlmClient} = {@code SaasYmlLlmClient}，行为完全等价于历史版本</li>
+ *   <li>Gateway 模式（私有部署）：{@code LlmClient} = {@code AigwLlmClient}，
+ *       通过 AIGW 网关代理调用模型，本地不再持有任何 API Key</li>
+ * </ul>
  *
  * <p>历史的"语音解析专属 SYSTEM_PROMPT"与"chatCompletion 通用接口"全部保留，
  * 上层调用方（VoiceParseService / MobileGoodsParseHelper / AnalysisNluService 等）无需改动。</p>

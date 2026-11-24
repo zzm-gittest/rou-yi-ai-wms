@@ -8,15 +8,19 @@ import com.ruoyi.wms.ai.spi.quota.QuotaResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
  * SaaS 模式下的 {@link AiQuotaGuard} 实现：直接包装 {@link AiPointsService}，
  * 行为与原有 Controller 内联代码一致。
  *
+ * <p>启用条件：{@code ai.client.mode=saas}（默认）。</p>
+ *
  * @author ruoyi
  */
 @Component
+@ConditionalOnProperty(name = "ai.client.mode", havingValue = "saas", matchIfMissing = true)
 public class SaasPointsQuotaGuard implements AiQuotaGuard {
 
     private static final Logger log = LoggerFactory.getLogger(SaasPointsQuotaGuard.class);

@@ -1,0 +1,61 @@
+# ===================================================================
+# WMS 私有部署 - AI Gateway 模式 yml 样例（节选片段）
+# ===================================================================
+#
+# 用法（任选其一）：
+# 1. 将下面 ai / aigw 两段拷贝到 application.yml 的对应位置
+# 2. 或者把本文件作为独立 profile 加载：
+#    --spring.config.additional-location=classpath:/application-ai-gateway.yml
+# 3. 或者用 spring.profiles.active=ai-gateway 并把文件改名为
+#    application-ai-gateway.yml（Spring 自动按 profile 拼接加载）
+#
+# 启用后效果：
+# - AI 调用全部走 AIGW 网关代理，本地不读取任何 DashScope / 通义千问 Key
+# - AiPointsService.tryConsumePoints/refundPoints 自动 no-op（不扣点不退点）
+# - 前端 /getPointsInfo 返回 deployMode=gateway / aiEnabled=true / metered=false
+# ===================================================================
+
+ai:
+  # 私有部署模式：所有 LLM 调用走 AIGW，跳过本地积分计量
+  client:
+    mode: gateway
+
+  # 私有部署后台任务等无 sa-token 场景下，CallerContext 的默认值
+  gateway-caller:
+    tenant-id: 1
+    user-name: wms-private-deploy
+
+# === AIGW 网关对接配置 ===
+# 注意：base-url 与 api-key 必须与 AIGW 端 aigw.internal.keys[*].key 严格匹配
+aigw:
+  gateway:
+    # AIGW 服务地址（生产建议走 HTTPS）；不要带末尾斜杠
+    base-url: ${AIGW_BASE_URL:https://aigw.example.com}
+
+    # 与 AIGW 侧 aigw.internal.headerName 一致
+    header-name: X-AIGW-Internal-Key
+
+    # 内部 API Key（强制使用环境变量注入，禁止明文写入）
+    api-key: ${AIGW_INTERNAL_KEY_WMS:please-change-me}
+
+    # 文本对话默认模型（必须存在于 AIGW chat_model 表且 model_show=1）
+    text-model: qwen-max
+
+    # 视觉对话默认模型
+    vision-model: qwen-vl-plus
+
+    # 连接 & 读超时；视觉调用图片较大，read 建议 >= 60000
+    connect-timeout-ms: 5000
+    read-timeout-ms: 90000
+
+    # 审计字段（写入 AIGW 侧 aigw_call_log.chat_id / user_open_id），可留空让 CallerContextResolver 动态填充
+    tenant-tag: ${WMS_TENANT_TAG:}
+    user-tag: ${WMS_USER_TAG:}
+
+# === 私有部署下不再需要的本地模型配置（可保留也可注释，运行时不会读取） ===
+# ai:
+#   service:
+#     qwen:
+#       api-key: ""   # 留空；本模式不会读取
+#     vision:
+#       api-key: ""

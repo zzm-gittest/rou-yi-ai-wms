@@ -11,11 +11,20 @@ import com.ruoyi.wms.domain.WmsPurchaseIn;
 import com.ruoyi.wms.domain.WmsPurchaseInItem;
 import com.ruoyi.wms.domain.WmsSupplier;
 import com.ruoyi.wms.domain.WmsWarehouse;
+import com.ruoyi.wms.domain.vo.ai.VoiceParseResultVO;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import com.ruoyi.wms.domain.vo.ai.chat.ChatRequestVO;
+import com.ruoyi.wms.domain.vo.ai.chat.ChatResponseVO;
+import com.ruoyi.wms.domain.vo.ai.recommend.PurchaseOrderRecommendVO;
+import com.ruoyi.wms.domain.vo.ai.recommend.SalesOrderRecommendVO;
+import com.ruoyi.wms.service.ai.VoiceParseService;
+import com.ruoyi.wms.service.ai.WmsChatService;
+import com.ruoyi.wms.service.ai.WmsRecommendService;
+import com.ruoyi.system.service.AiPointsService;
 import com.ruoyi.wms.service.WmsPurchaseInItemService;
 import com.ruoyi.wms.service.WmsPurchaseInService;
 import com.ruoyi.wms.service.WmsPurchaseOrderService;
@@ -30,7 +39,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import com.ruoyi.wms.domain.vo.ai.chat.ChatResponseVO;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * AI智能助手Controller
@@ -43,6 +52,264 @@ import com.ruoyi.wms.domain.vo.ai.chat.ChatResponseVO;
 public class WmsAiController extends BaseController {
 
     private static final Logger log = LoggerFactory.getLogger(WmsAiController.class);
+
+    @Autowired
+    private VoiceParseService voiceParseService;
+
+    @Autowired
+    private WmsRecommendService recommendService;
+
+    @Autowired
+    private WmsChatService chatService;
+
+    @Autowired
+    private AiPointsService aiPointsService;
+
+    /**
+     * 语音识别解析
+     * <p>
+     * 将语音文件转换为文本，然后使用LLM解析为结构化业务数据
+     *
+     * @param file 音频文件（支持mp3/wav/pcm格式）
+     * @return 解析结果
+     */
+    @ApiOperation("语音识别解析")
+    @PostMapping("/voiceParse")
+    public AjaxResult voiceParse(
+            @ApiParam("语音文件") @RequestParam("file") MultipartFile file) {
+
+        // 校验文件
+        if (file.isEmpty()) {
+            return AjaxResult.error("请上传语音文件");
+        }
+
+        // 校验文件类型
+        String filename = file.getOriginalFilename();
+        if (filename == null ||
+                (!filename.toLowerCase().endsWith(".mp3") &&
+                        !filename.toLowerCase().endsWith(".wav") &&
+                        !filename.toLowerCase().endsWith(".pcm"))) {
+            return AjaxResult.error("只支持mp3/wav/pcm格式的音频文件");
+        }
+
+        // 校验文件大小 (10MB)
+        if (file.getSize() > 10 * 1024 * 1024) {
+            return AjaxResult.error("语音文件大小不能超过10MB");
+        }
+
+        try {
+            // 点数检查：语音识别 + 文字解析
+            Long tenantId = TenantHolder.getTenantId();
+            if (!aiPointsService.tryConsumePoints(tenantId, AiPointsService.COST_VOICE, "voice")) {
+                return AjaxResult.error("AI点数不足，语音识别需要" + AiPointsService.COST_VOICE + "点，请充值");
+            }
+            if (!aiPointsService.tryConsumePoints(tenantId, AiPointsService.COST_TEXT, "text")) {
+                aiPointsService.refundPoints(tenantId, AiPointsService.COST_VOICE, "voice");
+                return AjaxResult.error("AI点数不足，文字解析需要" + AiPointsService.COST_TEXT + "点，请充值");
+            }
+
+            log.info("开始处理语音文件: {}, 大小: {}", filename, file.getSize());
+
+            // 调用语音解析服务
+            VoiceParseResultVO result = voiceParseService.parseVoice(file);
+
+            if (result.getSuccess()) {
+                return AjaxResult.success(result);
+            } else {
+                return AjaxResult.error(result.getErrorMessage());
+            }
+        } catch (Exception e) {
+            log.error("语音解析失败", e);
+            return AjaxResult.error("语音解析失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 文本智能解析
+     * <p>
+     * 直接将文本解析为结构化业务数据（跳过语音识别步骤）
+     * 可用于测试或直接文本输入场景
+     *
+     * @param text 输入文本
+     * @return 解析结果
+     */
+    @ApiOperation("文本智能解析")
+    @PostMapping("/textParse")
+    public AjaxResult textParse(
+            @ApiParam("输入文本") @RequestParam("text") String text) {
+
+        if (text == null || text.trim().isEmpty()) {
+            return AjaxResult.error("请输入文本");
+        }
+
+        try {
+            // 点数检查：文字解析扣1点
+            Long tenantId = TenantHolder.getTenantId();
+            if (!aiPointsService.tryConsumePoints(tenantId, AiPointsService.COST_TEXT, "text")) {
+                return AjaxResult.error("AI点数不足，文字解析需要" + AiPointsService.COST_TEXT + "点，请充值");
+            }
+
+            log.info("开始处理文本: {}", text);
+
+            // 调用文本解析服务
+            VoiceParseResultVO result = voiceParseService.parseText(text);
+
+            if (result.getSuccess()) {
+                return AjaxResult.success(result);
+            } else {
+                return AjaxResult.error(result.getErrorMessage());
+            }
+        } catch (Exception e) {
+            log.error("文本解析失败", e);
+            return AjaxResult.error("文本解析失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 获取采购订单推荐信息
+     * <p>
+     * 包括：常用供应商、常购商品、库存预警商品
+     *
+     * @return 推荐信息
+     */
+    @ApiOperation("获取采购订单推荐")
+    @GetMapping("/recommend/purchase")
+    public AjaxResult getPurchaseRecommend() {
+        try {
+            PurchaseOrderRecommendVO result = recommendService.getPurchaseOrderRecommend();
+            return AjaxResult.success(result);
+        } catch (Exception e) {
+            log.error("获取采购推荐失败", e);
+            return AjaxResult.error("获取采购推荐失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 获取销售订单推荐信息
+     * <p>
+     * 包括：常用客户、常购商品、库存状态
+     *
+     * @return 推荐信息
+     */
+    @ApiOperation("获取销售订单推荐")
+    @GetMapping("/recommend/sales")
+    public AjaxResult getSalesRecommend() {
+        try {
+            SalesOrderRecommendVO result = recommendService.getSalesOrderRecommend();
+            return AjaxResult.success(result);
+        } catch (Exception e) {
+            log.error("获取销售推荐失败", e);
+            return AjaxResult.error("获取销售推荐失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 健康检查
+     * <p>
+     * 检查AI服务是否可用
+     */
+    @ApiOperation("AI服务健康检查")
+    @GetMapping("/health")
+    public AjaxResult health() {
+        return AjaxResult.success("AI服务运行正常");
+    }
+
+    /**
+     * 对话式助手接口
+     * <p>
+     * 支持多轮对话，引导式完成复杂业务操作
+     *
+     * @param request 对话请求
+     * @return 对话响应
+     */
+    @ApiOperation("对话式助手")
+    @PostMapping("/chat")
+    public AjaxResult chat(@RequestBody ChatRequestVO request) {
+        try {
+            log.info("对话请求 - 会话ID: {}, 消息: {}",
+                    request.getConversationId(), request.getMessage());
+
+            // 设置当前用户ID
+            if (request.getUserId() == null) {
+                request.setUserId(getUserId());
+            }
+
+            // 点数检查：对话式助手每轮扣1点文字解析
+            Long tenantId = TenantHolder.getTenantId();
+            if (!aiPointsService.tryConsumePoints(tenantId, AiPointsService.COST_TEXT, "text")) {
+                return AjaxResult.error("AI点数不足，文字解析需要" + AiPointsService.COST_TEXT + "点，请充值");
+            }
+
+            ChatResponseVO response = chatService.chat(request);
+            return AjaxResult.success(response);
+        } catch (Exception e) {
+            log.error("对话处理失败", e);
+            return AjaxResult.error("对话处理失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 开始新对话
+     * <p>
+     * 指定操作类型，开始一个新的对话会话
+     *
+     * @param operationType 操作类型（create_purchase_order、create_sales_order等）
+     * @return 对话响应
+     */
+    @ApiOperation("开始新对话")
+    @PostMapping("/chat/start/{operationType}")
+    public AjaxResult startChat(
+            @ApiParam("操作类型") @PathVariable String operationType) {
+        try {
+            log.info("开始新对话 - 操作类型: {}", operationType);
+
+            Long userId = getUserId();
+            ChatResponseVO response = chatService.startChat(operationType, userId);
+            return AjaxResult.success(response);
+        } catch (Exception e) {
+            log.error("开始对话失败", e);
+            return AjaxResult.error("开始对话失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 清除对话上下文
+     *
+     * @param conversationId 会话ID
+     * @return 操作结果
+     */
+    @ApiOperation("清除对话上下文")
+    @DeleteMapping("/chat/context/{conversationId}")
+    public AjaxResult clearContext(
+            @ApiParam("会话ID") @PathVariable String conversationId) {
+        try {
+            chatService.clearContext(conversationId);
+            return AjaxResult.success("会话上下文已清除");
+        } catch (Exception e) {
+            log.error("清除会话上下文失败", e);
+            return AjaxResult.error("操作失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 获取对话上下文
+     *
+     * @param conversationId 会话ID
+     * @return 会话上下文信息
+     */
+    @ApiOperation("获取对话上下文")
+    @GetMapping("/chat/context/{conversationId}")
+    public AjaxResult getContext(
+            @ApiParam("会话ID") @PathVariable String conversationId) {
+        try {
+            ChatResponseVO response = chatService.getContext(conversationId);
+            return AjaxResult.success(response);
+        } catch (Exception e) {
+            log.error("获取会话上下文失败", e);
+            return AjaxResult.error("操作失败: " + e.getMessage());
+        }
+    }
+
     /**
      * 采购入库单保存回调（来自移动端）
      * <p>
@@ -427,6 +694,37 @@ public class WmsAiController extends BaseController {
     }
 
     /**
+     * 调试接口：查看当前用户权限
+     */
+    @ApiOperation("调试：查看当前用户权限")
+    @GetMapping("/debug/perms")
+    public AjaxResult debugPermissions() {
+        try {
+            LoginUser user = SecurityUtils.getLoginUser();
+            log.info("=== 权限调试 ===");
+            log.info("用户: {}", user != null ? user.getUsername() : "null");
+            log.info("用户ID: {}", user != null ? user.getUserId() : "null");
+            log.info("权限列表: {}", user != null ? user.getPermissions() : "null");
+            log.info("是否有wms:ai:parse: {}", user != null ? user.getPermissions().contains("wms:ai:parse") : "null");
+            log.info("是否有wms:ocr:upload: {}", user != null ? user.getPermissions().contains("wms:ocr:upload") : "null");
+            log.info("是否有wms:ocr:batchRecognize: {}", user != null ? user.getPermissions().contains("wms:ocr:batchRecognize") : "null");
+            log.info("================");
+
+            return AjaxResult.success()
+                .put("username", user != null ? user.getUsername() : "null")
+                .put("userId", user != null ? user.getUserId() : "null")
+                .put("permissions", user != null ? user.getPermissions() : "null")
+                .put("has_ocr_recognize", user != null && user.getPermissions().contains("wms:ocr:recognize"))
+                .put("has_ocr_upload", user != null && user.getPermissions().contains("wms:ocr:upload"))
+                .put("has_ocr_batchRecognize", user != null && user.getPermissions().contains("wms:ocr:batchRecognize"))
+                .put("has_ai_parse", user != null && user.getPermissions().contains("wms:ai:parse"));
+        } catch (Exception e) {
+            log.error("获取用户权限失败", e);
+            return AjaxResult.error("获取失败: " + e.getMessage());
+        }
+    }
+
+    /**
      * 获取临时订单数据（用于AI创建订单时的数据填充）
      *
      * @param tempDataKey 临时数据 key
@@ -455,5 +753,4 @@ public class WmsAiController extends BaseController {
             return AjaxResult.error("获取失败：" + e.getMessage());
         }
     }
-
 }

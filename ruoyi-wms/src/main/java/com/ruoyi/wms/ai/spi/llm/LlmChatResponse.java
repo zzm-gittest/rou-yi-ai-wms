@@ -30,7 +30,7 @@ public class LlmChatResponse implements Serializable {
     private String content;
 
     /**
-     * 实际使用的模型名称
+     * 实际使用的模型名称（SaaS 模式来自 yml，Gateway 模式来自 AIGW 响应）
      */
     private String modelName;
 

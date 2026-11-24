@@ -13,12 +13,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -78,6 +82,11 @@ public class VoiceParseService {
             result.setRecognizedText(recognizedText);
             log.info("语音识别结果: {}", recognizedText);
 
+            // 优先本地NLU
+            VoiceParseResultVO localNluResult = parseWithLocalNlu(recognizedText);
+            if (localNluResult != null && Boolean.TRUE.equals(localNluResult.getSuccess())) {
+                return localNluResult;
+            }
 
             // 2. LLM解析语义
             log.info("开始语义解析...");
@@ -107,12 +116,17 @@ public class VoiceParseService {
         try {
             result.setRecognizedText(text);
 
-            // 截图识别场景：前置视觉模型已返回结构化 JSON，直接复用，跳过文本模型解析
+            // 截图识别场景：前置视觉模型已返回结构化 JSON，直接复用，跳过本地NLU与文本模型解析
             VoiceParseResultVO visionResult = tryParseImageRecognition(text);
             if (visionResult != null) {
                 return visionResult;
             }
 
+            // 优先本地NLU（Roberta-Tiny）
+            VoiceParseResultVO localNluResult = parseWithLocalNlu(text);
+            if (localNluResult != null && Boolean.TRUE.equals(localNluResult.getSuccess())) {
+                return localNluResult;
+            }
 
             // 回退LLM解析语义
             String llmResponse = llmService.parseVoiceText(text);
@@ -228,6 +242,427 @@ public class VoiceParseService {
         }
     }
 
+    private VoiceParseResultVO parseWithLocalNlu(String text) {
+        if (aiProperties.getLocalNlu() == null || !Boolean.TRUE.equals(aiProperties.getLocalNlu().getEnabled())) {
+            return null;
+        }
+        if (StringUtils.isBlank(text)) {
+            return null;
+        }
+
+        try {
+                String baseUrl = StringUtils.isBlank(aiProperties.getLocalNlu().getBaseUrl())
+                    ? "http://127.0.0.1:18080"
+                    : aiProperties.getLocalNlu().getBaseUrl();
+                String nluPath = StringUtils.isBlank(aiProperties.getLocalNlu().getNluPath())
+                    ? "/nlu"
+                    : aiProperties.getLocalNlu().getNluPath();
+            String endpoint = baseUrl.endsWith("/")
+                    ? baseUrl.substring(0, baseUrl.length() - 1) + nluPath
+                    : baseUrl + nluPath;
+
+            Map<String, Object> req = new HashMap<>();
+            req.put("text", text);
+            req.put("top_k", 3);
+
+            RestTemplate restTemplate = createRestTemplate(aiProperties.getLocalNlu().getTimeoutMs());
+            String response = restTemplate.postForObject(endpoint, req, String.class);
+            if (StringUtils.isBlank(response)) {
+                return null;
+            }
+
+            JsonNode root = objectMapper.readTree(response);
+            VoiceParseResultVO result = convertLocalNluResponse(root, text);
+            if (result == null || !Boolean.TRUE.equals(result.getSuccess())) {
+                return null;
+            }
+            return result;
+        } catch (Exception ex) {
+            log.warn("本地NLU调用失败，回退到LLM解析: {}", ex.getMessage());
+            return null;
+        }
+    }
+
+    private RestTemplate createRestTemplate(Integer timeoutMs) {
+        int timeout = (timeoutMs == null || timeoutMs <= 0) ? 2500 : timeoutMs;
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(timeout);
+        factory.setReadTimeout(timeout);
+        return new RestTemplate(factory);
+    }
+
+    private VoiceParseResultVO convertLocalNluResponse(JsonNode node, String text) {
+        VoiceParseResultVO result = new VoiceParseResultVO();
+        result.setRecognizedText(text);
+
+        log.info("=== 本地NLU原始响应: {}", node.toString());
+
+        String intent = node.path("intent").asText(null);
+        double confidence = node.path("intent_confidence").asDouble(
+                node.path("confidence").asDouble(0.0)
+        );
+
+        result.setOperationType(mapOperationType(intent));
+
+        // 处理 slots 对象格式（文档约定的格式）
+        if (node.has("slots") && node.get("slots").isObject()) {
+            JsonNode slots = node.get("slots");
+            log.info("=== 本地NLU slots: {}", slots.toString());
+            // 供应商
+            String supplierName = sanitizePartnerSlot(slots.path("supplierName").asText(null), text, true);
+            if (StringUtils.isNotBlank(supplierName)) {
+                VoiceParseResultVO.PartnerInfo supplier = new VoiceParseResultVO.PartnerInfo();
+                supplier.setName(supplierName);
+                matchSupplier(supplier);
+                result.setSupplier(supplier);
+            }
+            // 客户
+            String customerName = sanitizePartnerSlot(slots.path("customerName").asText(null), text, false);
+            if (StringUtils.isNotBlank(customerName)) {
+                VoiceParseResultVO.PartnerInfo customer = new VoiceParseResultVO.PartnerInfo();
+                customer.setName(customerName);
+                matchCustomer(customer);
+                result.setCustomer(customer);
+            }
+            // 仓库
+            String warehouse = slots.path("warehouse").asText(null);
+            if (StringUtils.isNotBlank(warehouse)) {
+                result.setWarehouse(warehouse);
+            }
+            String outWarehouse = slots.path("outWarehouse").asText(null);
+            if (StringUtils.isNotBlank(outWarehouse)) {
+                result.setOutWarehouse(outWarehouse);
+            }
+            String inWarehouse = slots.path("inWarehouse").asText(null);
+            if (StringUtils.isNotBlank(inWarehouse)) {
+                result.setInWarehouse(inWarehouse);
+            }
+            // 备注/退货原因
+            String remark = slots.path("remark").asText(null);
+            log.info("=== 本地NLU slots.remark: {}", remark);
+            if (StringUtils.isNotBlank(remark)) {
+                result.setRemark(remark);
+            }
+
+            JsonNode itemsNode = slots.get("items");
+            if (itemsNode != null && itemsNode.isArray()) {
+                result.setGoods(normalizeLocalNluGoodsItems(parseLocalGoodsItems(itemsNode, result.getOperationType()), text, result.getOperationType()));
+            }
+        }
+
+        // 处理 entities 数组格式（兼容旧格式）
+        if (node.has("entities") && node.get("entities").isArray()) {
+            for (JsonNode entity : node.get("entities")) {
+                String entityType = entity.path("entity").asText("").toLowerCase(Locale.ROOT);
+                String value = entity.path("value").asText("").trim();
+                if (StringUtils.isBlank(value)) {
+                    continue;
+                }
+                if (entityType.contains("supplier") || entityType.contains("vendor")) {
+                    if (result.getSupplier() == null) {
+                        String sanitizedSupplier = sanitizePartnerSlot(value, text, true);
+                        if (StringUtils.isBlank(sanitizedSupplier)) {
+                            continue;
+                        }
+                        VoiceParseResultVO.PartnerInfo supplier = new VoiceParseResultVO.PartnerInfo();
+                        supplier.setName(sanitizedSupplier);
+                        matchSupplier(supplier);
+                        result.setSupplier(supplier);
+                    }
+                } else if (entityType.contains("customer") || entityType.contains("client")) {
+                    if (result.getCustomer() == null) {
+                        String sanitizedCustomer = sanitizePartnerSlot(value, text, false);
+                        if (StringUtils.isBlank(sanitizedCustomer)) {
+                            continue;
+                        }
+                        VoiceParseResultVO.PartnerInfo customer = new VoiceParseResultVO.PartnerInfo();
+                        customer.setName(sanitizedCustomer);
+                        matchCustomer(customer);
+                        result.setCustomer(customer);
+                    }
+                } else if (entityType.contains("warehouse") || entityType.contains("location")) {
+                    if (StringUtils.isBlank(result.getWarehouse())) {
+                        result.setWarehouse(value);
+                    }
+                } else if (entityType.contains("reason") || entityType.contains("remark") || entityType.contains("cause")) {
+                    log.info("=== 本地NLU entities 中发现 reason/remark/cause: {}", value);
+                    if (StringUtils.isBlank(result.getRemark())) {
+                        result.setRemark(value);
+                    }
+                }
+            }
+        }
+
+        if ((result.getGoods() == null || result.getGoods().isEmpty()) && node.has("goods") && node.get("goods").isArray()) {
+            result.setGoods(normalizeLocalNluGoodsItems(parseLocalGoodsItems(node.get("goods"), result.getOperationType()), text, result.getOperationType()));
+        }
+
+        inferOperationType(result);
+
+        double minConfidence = aiProperties.getLocalNlu().getMinConfidence() == null
+                ? 0.45
+                : aiProperties.getLocalNlu().getMinConfidence();
+        boolean hasStructuredData = hasStructuredData(result);
+        boolean pass = isSemanticResultAccepted(
+            result,
+            text,
+            hasStructuredData || (confidence >= minConfidence && isReliableIntent(intent))
+        );
+
+        result.setSuccess(pass);
+        if (!pass) {
+            result.setErrorMessage("本地NLU未提取到可靠结构化结果");
+        }
+        return result;
+    }
+
+    private List<VoiceParseResultVO.GoodsItem> parseLocalGoodsItems(JsonNode itemsNode, String operationType) {
+        List<VoiceParseResultVO.GoodsItem> goodsItems = new ArrayList<>();
+        for (JsonNode itemNode : itemsNode) {
+            VoiceParseResultVO.GoodsItem item = new VoiceParseResultVO.GoodsItem();
+
+            String name = firstNonBlank(
+                    itemNode.path("name").asText(null),
+                    itemNode.path("goodsName").asText(null),
+                    itemNode.path("skuName").asText(null)
+            );
+            if (StringUtils.isBlank(name)) {
+                continue;
+            }
+            item.setName(name);
+
+            String spec = firstNonBlank(
+                    itemNode.path("spec").asText(null),
+                    itemNode.path("skuName").asText(null)
+            );
+            if (StringUtils.isNotBlank(spec)) {
+                item.setSpec(spec);
+            }
+
+            item.setQuantity(parseDecimalFlexible(itemNode, "quantity"));
+            item.setUnit(firstNonBlank(itemNode.path("unit").asText(null), itemNode.path("unitName").asText(null)));
+            item.setPrice(parseDecimalFlexible(itemNode, "price", "unitPrice"));
+            item.setAmount(parseDecimalFlexible(itemNode, "amount", "totalAmount"));
+
+            if (item.getAmount() == null && item.getQuantity() != null && item.getPrice() != null) {
+                item.setAmount(item.getQuantity().multiply(item.getPrice()));
+            }
+            goodsItems.add(item);
+        }
+        return goodsItems;
+    }
+
+    private List<VoiceParseResultVO.GoodsItem> normalizeLocalNluGoodsItems(List<VoiceParseResultVO.GoodsItem> parsedItems, String text, String operationType) {
+        List<VoiceParseResultVO.GoodsItem> sanitizedParsedItems = deduplicateGoodsItems(parsedItems);
+        List<VoiceParseResultVO.GoodsItem> naturalItems = extractNaturalGoodsItems(text);
+        if (naturalItems.isEmpty()) {
+            for (VoiceParseResultVO.GoodsItem item : sanitizedParsedItems) {
+                if (item.getSkuId() == null && item.getIsNew() == null) {
+                    matchGoods(item, operationType);
+                }
+            }
+            return sanitizedParsedItems;
+        }
+
+        LinkedHashMap<String, VoiceParseResultVO.GoodsItem> parsedByName = new LinkedHashMap<>();
+        for (VoiceParseResultVO.GoodsItem item : sanitizedParsedItems) {
+            String normalizedName = normalizeName(item.getName());
+            if (StringUtils.isBlank(normalizedName) || parsedByName.containsKey(normalizedName)) {
+                continue;
+            }
+            parsedByName.put(normalizedName, item);
+        }
+
+        List<VoiceParseResultVO.GoodsItem> rebuilt = new ArrayList<>();
+        for (VoiceParseResultVO.GoodsItem naturalItem : naturalItems) {
+            String normalizedNaturalName = normalizeName(naturalItem.getName());
+            VoiceParseResultVO.GoodsItem parsedMatch = parsedByName.get(normalizedNaturalName);
+            VoiceParseResultVO.GoodsItem merged = cloneGoodsItem(naturalItem);
+            if (parsedMatch != null) {
+                if (StringUtils.isBlank(merged.getSpec())) {
+                    merged.setSpec(parsedMatch.getSpec());
+                }
+                if (StringUtils.isBlank(merged.getUnit())) {
+                    merged.setUnit(parsedMatch.getUnit());
+                }
+                if (merged.getPrice() == null) {
+                    merged.setPrice(parsedMatch.getPrice());
+                }
+                if (merged.getAmount() == null) {
+                    merged.setAmount(parsedMatch.getAmount());
+                }
+                merged.setSkuId(parsedMatch.getSkuId());
+                merged.setIsNew(parsedMatch.getIsNew());
+            }
+            if (merged.getSkuId() == null && merged.getIsNew() == null) {
+                matchGoods(merged, operationType);
+            }
+            rebuilt.add(merged);
+        }
+        return rebuilt.isEmpty() ? sanitizedParsedItems : rebuilt;
+    }
+
+    private List<VoiceParseResultVO.GoodsItem> deduplicateGoodsItems(List<VoiceParseResultVO.GoodsItem> items) {
+        LinkedHashMap<String, VoiceParseResultVO.GoodsItem> deduplicated = new LinkedHashMap<>();
+        if (items == null) {
+            return new ArrayList<>();
+        }
+        for (VoiceParseResultVO.GoodsItem item : items) {
+            if (item == null || StringUtils.isBlank(item.getName())) {
+                continue;
+            }
+            String key = normalizeName(item.getName()) + "#" + (item.getQuantity() == null ? "" : item.getQuantity().stripTrailingZeros().toPlainString()) + "#" + StringUtils.defaultString(item.getUnit());
+            VoiceParseResultVO.GoodsItem existing = deduplicated.get(key);
+            if (existing == null || item.getName().length() > existing.getName().length()) {
+                deduplicated.put(key, item);
+            }
+        }
+        return new ArrayList<>(deduplicated.values());
+    }
+
+    private List<VoiceParseResultVO.GoodsItem> extractNaturalGoodsItems(String text) {
+        List<VoiceParseResultVO.GoodsItem> items = new ArrayList<>();
+        if (StringUtils.isBlank(text)) {
+            return items;
+        }
+        String normalized = text.replace("；", ";").replace("，", ";").replace("、", ";").replace("。", "").trim();
+        String[] segments = normalized.split(";");
+        for (String segment : segments) {
+            VoiceParseResultVO.GoodsItem item = parseNaturalGoodsItem(segment);
+            if (item != null) {
+                items.add(item);
+            }
+        }
+        return items;
+    }
+
+    private VoiceParseResultVO.GoodsItem parseNaturalGoodsItem(String segment) {
+        if (StringUtils.isBlank(segment)) {
+            return null;
+        }
+        Matcher qtyMatcher = NATURAL_QTY_UNIT_PATTERN.matcher(segment);
+        Integer chosenStart = null;
+        Integer chosenEnd = null;
+        String qtyText = null;
+        String unitText = null;
+        while (qtyMatcher.find()) {
+            chosenStart = qtyMatcher.start();
+            chosenEnd = qtyMatcher.end();
+            qtyText = qtyMatcher.group("qty");
+            unitText = qtyMatcher.group("unit");
+        }
+        if (chosenStart == null || chosenEnd == null || StringUtils.isBlank(qtyText)) {
+            return null;
+        }
+
+        String goodsName = cleanupNaturalGoodsName(segment.substring(0, chosenStart));
+        if (StringUtils.isBlank(goodsName)) {
+            return null;
+        }
+        if (unitText == null && looksLikePriceOnlySegment(segment, goodsName)) {
+            return null;
+        }
+
+        VoiceParseResultVO.GoodsItem item = new VoiceParseResultVO.GoodsItem();
+        item.setName(goodsName);
+        item.setQuantity(new BigDecimal(qtyText));
+        item.setUnit(unitText);
+
+        Matcher priceMatcher = NATURAL_PRICE_PATTERN.matcher(segment.substring(chosenEnd));
+        if (priceMatcher.find() && StringUtils.isNotBlank(priceMatcher.group("price"))) {
+            item.setPrice(new BigDecimal(priceMatcher.group("price")));
+        }
+        if (item.getPrice() != null) {
+            item.setAmount(item.getPrice().multiply(item.getQuantity()));
+        }
+        return item;
+    }
+
+    private String cleanupNaturalGoodsName(String raw) {
+        if (StringUtils.isBlank(raw)) {
+            return null;
+        }
+        String name = raw.trim();
+        name = name.replaceAll("(?:向|从|跟)\\s*[^，,。\\d采买进货]{2,30}\\s*(?:采购|买|进货)", "").trim();
+        name = name.replaceAll("供应商(?:是|为)?[:：]?\\s*[^，,。\\d]{2,30}", "").trim();
+        name = name.replaceAll("(?:卖给|给)\\s*[^，,。\\d发出库退回]{1,30}", "").trim();
+        name = name.replaceAll("客户(?:是|为)?[:：]?\\s*[^，,。\\d]{2,30}", "").trim();
+        name = name.replaceAll("采购订单|采购入库|采购单|采购|进货|买|下单|创建|新增|帮我", "").trim();
+        name = name.replaceAll("销售订单|销售出库|销售退货|销售|出库|发货|卖", "").trim();
+        name = name.replaceAll("^[，,：:;；\\s]+|[，,：:;；\\s]+$", "").trim();
+        name = name.replaceAll("\\s+", "");
+        return name;
+    }
+
+    private boolean looksLikePriceOnlySegment(String segment, String goodsName) {
+        if (StringUtils.isBlank(segment) || StringUtils.isBlank(goodsName)) {
+            return false;
+        }
+        String normalizedSegment = segment.replace(" ", "");
+        return (normalizedSegment.contains("单价") || normalizedSegment.contains("价格") || normalizedSegment.startsWith("每"))
+                && ("单价".equals(goodsName) || "价格".equals(goodsName));
+    }
+
+    private String sanitizePartnerSlot(String partnerName, String text, boolean supplier) {
+        if (StringUtils.isBlank(partnerName)) {
+            return null;
+        }
+        String trimmed = partnerName.trim();
+        if (trimmed.length() < 2) {
+            return null;
+        }
+        if (supplier && isPurchaseTextWithoutSupplierCue(text) && trimmed.length() <= 2) {
+            return null;
+        }
+        return trimmed;
+    }
+
+    private boolean isPurchaseTextWithoutSupplierCue(String text) {
+        if (StringUtils.isBlank(text)) {
+            return false;
+        }
+        String normalized = text.replace(" ", "");
+        return normalized.contains("采购")
+                && !normalized.contains("供应商")
+                && !normalized.contains("向")
+                && !normalized.contains("从");
+    }
+
+    private VoiceParseResultVO.GoodsItem cloneGoodsItem(VoiceParseResultVO.GoodsItem source) {
+        VoiceParseResultVO.GoodsItem target = new VoiceParseResultVO.GoodsItem();
+        target.setName(source.getName());
+        target.setBarcode(source.getBarcode());
+        target.setSpec(source.getSpec());
+        target.setQuantity(source.getQuantity());
+        target.setUnit(source.getUnit());
+        target.setPrice(source.getPrice());
+        target.setAmount(source.getAmount());
+        target.setSkuId(source.getSkuId());
+        target.setIsNew(source.getIsNew());
+        return target;
+    }
+
+    private BigDecimal parseDecimalFlexible(JsonNode node, String... fieldNames) {
+        for (String fieldName : fieldNames) {
+            JsonNode valueNode = node.get(fieldName);
+            if (valueNode == null || valueNode.isNull()) {
+                continue;
+            }
+            if (valueNode.isNumber()) {
+                return valueNode.decimalValue();
+            }
+            String value = valueNode.asText(null);
+            if (StringUtils.isBlank(value)) {
+                continue;
+            }
+            try {
+                return new BigDecimal(value.trim());
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return null;
+    }
+
     private String firstNonBlank(String... values) {
         for (String value : values) {
             if (StringUtils.isNotBlank(value)) {
@@ -235,6 +670,28 @@ public class VoiceParseService {
             }
         }
         return null;
+    }
+
+    private String mapOperationType(String intent) {
+        String lowerIntent = StringUtils.isBlank(intent) ? "" : intent.toLowerCase(Locale.ROOT);
+
+        if (lowerIntent.contains("sales")) {
+            return "sales";
+        }
+        if (lowerIntent.contains("purchase")) {
+            return "purchase";
+        }
+        if (lowerIntent.contains("stock")) {
+            return "stock";
+        }
+        if (lowerIntent.contains("goods")) {
+            return "goods";
+        }
+        return null;
+    }
+
+    private boolean isReliableIntent(String intent) {
+        return StringUtils.isNotBlank(mapOperationType(intent));
     }
 
     private boolean isIntentConsistentWithText(String text, String operationType) {

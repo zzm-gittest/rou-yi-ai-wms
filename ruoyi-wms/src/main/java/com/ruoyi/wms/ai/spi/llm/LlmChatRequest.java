@@ -13,6 +13,9 @@ import java.util.List;
 /**
  * 通用 LLM 文本对话请求。
  *
+ * <p>这是 WMS 内部抽象，与 AIGW 代理端点的 DTO 解耦；
+ * 由 {@link com.ruoyi.wms.ai.spi.llm.impl.gateway.AigwLlmClient} 在出栈时转换。</p>
+ *
  * @author ruoyi
  */
 @Data

@@ -1,0 +1,44 @@
+# ===================================================================
+# WMS SaaS 部署 - AI 自管模式 yml 样例（节选片段，等价于历史行为）
+# ===================================================================
+#
+# 这是默认部署模式，application.yml 中的 ai.service.qwen.* 和 ai.service.vision.*
+# 即历史 SaaS 配置；本文件主要展示如何显式声明 ai.client.mode=saas。
+#
+# 用法：
+# 1. 不配置任何 ai.client.mode → 默认就是 saas，等价于本文件
+# 2. 显式声明 spring.profiles.active=ai-saas 加载本文件
+# ===================================================================
+
+ai:
+  # SaaS 模式：使用本地 ai.service.qwen.api-key 直连 DashScope，按租户扣 AI 点数
+  client:
+    mode: saas
+
+  service:
+    enabled: true
+
+    # 通义千问 LLM（SaaS 自管 Key）
+    qwen:
+      api-key: ${DASHSCOPE_API_KEY:please-fill-your-key}
+      api-url: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+      model: qwen-plus
+      max-tokens: 2000
+      temperature: 0.7
+
+    # 多模态视觉模型
+    vision:
+      api-key: ${DASHSCOPE_VISION_API_KEY:}
+      api-url: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+      model: qwen3.8-omni-flash
+      max-tokens: 2000
+
+    # 本地 Roberta-Tiny NLU
+    local-nlu:
+      enabled: true
+      base-url: ${AI_LOCAL_NLU_BASE_URL:http://127.0.0.1:18080}
+      nlu-path: /nlu
+      timeout-ms: 2500
+      min-confidence: 0.45
+
+# 在 SaaS 模式下：aigw.gateway.* 配置项无意义，可全部留空或不出现

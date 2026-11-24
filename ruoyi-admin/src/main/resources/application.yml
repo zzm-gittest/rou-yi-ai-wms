@@ -164,6 +164,11 @@ xss:
 
 # AI服务配置
 ai:
+  # AI 客户端模式：saas（默认，使用本机 yml 中的 ai.service.qwen.api-key 直连 DashScope，按 AI 点数计量）
+  # 或 gateway（私有部署，通过 AIGW 网关代理调模型）/ dsh（通过 DeepSeek Harness dsh 桥接端点调模型，
+  # 模型 Key 由 dsh 侧持有，本地不再读 api-key；详见 application-dsh.yml / application-ai-gateway.yml）
+  client:
+    mode: ${AI_CLIENT_MODE:saas}
   service:
     enabled: true
     # 通义千问配置
@@ -183,6 +188,13 @@ ai:
     # 注意：租户级"AI语音模型"配置优先于此处，若租户里存了 fun-asr-realtime 需在租户管理里同步改掉
     asr:
       model: paraformer-realtime-v2
+    # 本地 Roberta-Tiny NLU 服务（可选，用于录单意图的本地快速解析；未部署时保持 false，走 LLM 解析）
+    local-nlu:
+      enabled: ${AI_LOCAL_NLU_ENABLED:false}
+      base-url: ${AI_LOCAL_NLU_BASE_URL:http://127.0.0.1:18080}
+      nlu-path: /nlu
+      timeout-ms: 2500
+      min-confidence: 0.45
 
 # 云打印配置
 cloud:

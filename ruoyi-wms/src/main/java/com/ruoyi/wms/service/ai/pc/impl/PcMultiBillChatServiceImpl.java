@@ -433,6 +433,10 @@ public class PcMultiBillChatServiceImpl implements PcMultiBillChatService {
         return draftFlowSupport.buildDirectPurchaseLine(draft, sku);
     }
 
+    WmsGoodsSkuRespVO chooseExactlyNamedSingle(List<WmsGoodsSkuRespVO> list, String name) {
+        return draftFlowSupport.chooseExactlyNamedSingle(list, name);
+    }
+
     List<LineDraft> compactPreparedLines(List<LineDraft> lines) {
         return draftFlowSupport.compactPreparedLines(lines);
     }
@@ -788,10 +792,6 @@ public class PcMultiBillChatServiceImpl implements PcMultiBillChatService {
 
     Map<String, Object> handleGoodsCandidateText(PcState state, String input) {
         return goodsFlowSupport.handleGoodsCandidateText(state, input);
-    }
-
-    WmsGoodsSkuRespVO chooseExactOrSingle(List<WmsGoodsSkuRespVO> list, String name) {
-        return draftFlowSupport.chooseExactOrSingle(list, name);
     }
 
     String detectAction(String input) {

@@ -19,8 +19,6 @@ export default {
       this.syncConversationSnapshot()
     },
     restoreConversations() {
-      // 清理历史遗留的无租户隔离的固定 key（旧版本数据，任何账号都不应再读取）
-      window.localStorage.removeItem('wms-ai-pc-chat-history-v2')
       const raw = window.localStorage.getItem(this.storageKey)
       if (!raw) {
         this.conversations = []

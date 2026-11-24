@@ -1105,6 +1105,7 @@ export default {
       scenarioRunning: false,
       isNearBottom: true,
       showNewMessageHint: false,
+      storageKey: 'wms-ai-pc-chat-history-v2',
       candidateSelectionCache: {
         goods: []
       },
@@ -1130,16 +1131,8 @@ export default {
   },
   computed: {
     ...mapGetters([
-      'avatar',
-      'id',
-      'name'
+      'avatar'
     ]),
-    // 会话快照按 租户+用户 隔离，避免同一浏览器切换账号/租户后加载到其他租户的会话
-    storageKey() {
-      const tenantId = this.$store.state.user.tenantId || 'no-tenant'
-      const userId = this.id || this.name || 'no-user'
-      return 'wms-ai-pc-chat-history-v2-' + tenantId + '-' + userId
-    },
     aiLogo() {
       return this.$buildCosImageUrl('logo.png')
     },

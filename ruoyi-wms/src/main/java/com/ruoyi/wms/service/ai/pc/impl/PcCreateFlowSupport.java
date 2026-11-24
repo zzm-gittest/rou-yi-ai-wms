@@ -363,14 +363,17 @@ class PcCreateFlowSupport {
                     owner.conversationLifecycleSupport.saveState(state);
                     return owner.conversationLifecycleSupport.buildReply(state, "商品【" + draft.name + "】不存在，请先补充商品资料。", owner.goodsFlowSupport.goodsCreateFormCard(state), owner.conversationLifecycleSupport.quickActions("取消"));
                 }
-                WmsGoodsSkuRespVO exact = owner.chooseExactOrSingle(candidates, draft.name);
-                if (exact == null) {
+                // 候选中恰好 1 个且命名完全相同 → 直接自动选中；
+                // 其余情况（含恰好 1 个但名字不完全相同）统一进候选卡（带「以上都不是」）。
+                WmsGoodsSkuRespVO exactNamed = owner.chooseExactlyNamedSingle(candidates, draft.name);
+                if (exactNamed != null) {
+                    chosen = exactNamed;
+                } else {
                     owner.preparePendingGoods(state, draft, index, candidates.stream().map(owner::toGoodsOption).collect(Collectors.toList()));
                     state.setStep("WAIT_GOODS_CANDIDATE");
                     owner.conversationLifecycleSupport.saveState(state);
                     return owner.goodsFlowSupport.buildGoodsCandidateReply(state);
                 }
-                chosen = exact;
             }
 
             LineDraft line = new LineDraft();

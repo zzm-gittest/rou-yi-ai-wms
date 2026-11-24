@@ -14,7 +14,8 @@ import java.util.Base64;
 /**
  * 多模态 LLM 服务（保持原有 public API；底层委托给 {@link LlmClient} SPI）。
  *
- * <p>行为完全等价于历史版本（DashScope qwen-vl 系列）。</p>
+ * <p>SaaS 模式下行为完全等价于历史版本（DashScope qwen-vl-plus）；
+ * Gateway 模式下通过 AIGW {@code /open/aigw/internal/ai/llm/vision} 调用模型。</p>
  *
  * <p>上层调用方（MobileChatServiceImpl / PcMultiBillChatServiceImpl）保持不变。</p>
  *

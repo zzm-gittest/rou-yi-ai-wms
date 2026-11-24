@@ -35,6 +35,11 @@ public class AiProperties {
     private AsrConfig asr = new AsrConfig();
 
     /**
+     * 本地NLU服务配置（Roberta-Tiny）
+     */
+    private LocalNluConfig localNlu = new LocalNluConfig();
+
+    /**
      * 通义千问配置
      */
     public static class QwenConfig {
@@ -123,6 +128,76 @@ public class AiProperties {
         }
     }
 
+    /**
+     * 本地NLU服务配置
+     */
+    public static class LocalNluConfig {
+        /**
+         * 是否启用本地NLU优先策略
+         */
+        private Boolean enabled = false;
+
+        /**
+         * 本地NLU服务基地址
+         */
+        private String baseUrl = "http://127.0.0.1:18080";
+
+        /**
+         * 联合理解接口路径
+         */
+        private String nluPath = "/nlu";
+
+        /**
+         * 请求超时时间（毫秒）
+         */
+        private Integer timeoutMs = 2500;
+
+        /**
+         * 意图置信度阈值，低于阈值认为不可靠
+         */
+        private Double minConfidence = 0.45;
+
+        public Boolean getEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(Boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getBaseUrl() {
+            return baseUrl;
+        }
+
+        public void setBaseUrl(String baseUrl) {
+            this.baseUrl = baseUrl;
+        }
+
+        public String getNluPath() {
+            return nluPath;
+        }
+
+        public void setNluPath(String nluPath) {
+            this.nluPath = nluPath;
+        }
+
+        public Integer getTimeoutMs() {
+            return timeoutMs;
+        }
+
+        public void setTimeoutMs(Integer timeoutMs) {
+            this.timeoutMs = timeoutMs;
+        }
+
+        public Double getMinConfidence() {
+            return minConfidence;
+        }
+
+        public void setMinConfidence(Double minConfidence) {
+            this.minConfidence = minConfidence;
+        }
+    }
+
     public Boolean getEnabled() {
         return enabled;
     }
@@ -137,6 +212,14 @@ public class AiProperties {
 
     public void setQwen(QwenConfig qwen) {
         this.qwen = qwen;
+    }
+
+    public LocalNluConfig getLocalNlu() {
+        return localNlu;
+    }
+
+    public void setLocalNlu(LocalNluConfig localNlu) {
+        this.localNlu = localNlu;
     }
 
     public VisionConfig getVision() {

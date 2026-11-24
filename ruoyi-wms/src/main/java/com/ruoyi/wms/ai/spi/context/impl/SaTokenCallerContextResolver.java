@@ -6,15 +6,19 @@ import com.ruoyi.wms.ai.spi.context.CallerContext;
 import com.ruoyi.wms.ai.spi.context.CallerContextResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
  * SaaS 模式下的 {@link CallerContextResolver} 实现：
  * 从 sa-token 的 SecurityUtils + TenantHolder 解析。
  *
+ * <p>启用条件：{@code ai.client.mode=saas}（默认）。</p>
+ *
  * @author ruoyi
  */
 @Component
+@ConditionalOnProperty(name = "ai.client.mode", havingValue = "saas", matchIfMissing = true)
 public class SaTokenCallerContextResolver implements CallerContextResolver {
 
     private static final Logger log = LoggerFactory.getLogger(SaTokenCallerContextResolver.class);

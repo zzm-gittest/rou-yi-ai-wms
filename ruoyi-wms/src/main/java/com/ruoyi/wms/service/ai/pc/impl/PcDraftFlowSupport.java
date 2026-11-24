@@ -110,17 +110,24 @@ class PcDraftFlowSupport {
         return owner.resumeCurrentFlow(state);
     }
 
-    WmsGoodsSkuRespVO chooseExactOrSingle(List<WmsGoodsSkuRespVO> list, String name) {
-        if (list == null || list.isEmpty()) {
+    // 商品候选默认不自动选中：统一进候选卡，用户可从列表选择或点「以上都不是」逃逸到
+    // 新增商品流程。唯一例外：候选中恰好 1 个且命名完全相同（忽略空格/大小写）时
+    // 直接自动选中，无需候选卡。
+    WmsGoodsSkuRespVO chooseExactlyNamedSingle(List<WmsGoodsSkuRespVO> list, String name) {
+        if (list == null || list.isEmpty() || name == null) {
             return null;
         }
-        if (list.size() == 1) {
-            return list.get(0);
-        }
-        List<WmsGoodsSkuRespVO> exactMatches = list.stream()
-                .filter(vo -> equalsIgnoreCase(vo.getSkuName(), name) || equalsIgnoreCase(vo.getGoodsName(), name))
+        List<WmsGoodsSkuRespVO> exact = list.stream()
+                .filter(vo -> equalsNameIgnoreSpace(vo.getSkuName(), name) || equalsNameIgnoreSpace(vo.getGoodsName(), name))
                 .collect(Collectors.toList());
-        return exactMatches.size() == 1 ? exactMatches.get(0) : null;
+        return exact.size() == 1 ? exact.get(0) : null;
+    }
+
+    private boolean equalsNameIgnoreSpace(String a, String b) {
+        if (a == null || b == null) {
+            return false;
+        }
+        return a.replaceAll("\\s+", "").equalsIgnoreCase(b.replaceAll("\\s+", ""));
     }
 
     private boolean containsIgnoreCase(String text, String search) {

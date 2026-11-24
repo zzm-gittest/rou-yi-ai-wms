@@ -1,0 +1,55 @@
+# ===================================================================
+# WMS - AI 对接 DeepSeek Harness（dsh）桥接模式配置样例
+# ===================================================================
+#
+# 用途：让 WMS 的模型调用由 dsh 提供（用 dsh「设置 → 模型」里配置的模型），
+#       WMS 本地不再持有任何模型 Key，也不扣 AI 点数。
+#
+# 启用方式（不影响 prod 里的数据源等配置）：
+#   export DSH_BASE_URL=http://<dsh 部署机器>:3080
+#   export DSH_BRIDGE_TOKEN=<与 dsh 插件 sharedSecret 一致的强随机串>
+#   java -jar ruoyi-admin.jar --spring.profiles.active=prod,dsh
+#   （Spring Boot 多 profile：prod 提供数据源等，dsh 只提供桥接配置 + ai.client.mode=dsh，两者叠加）
+#
+# 本文件按 Spring 约定命名，profile 名为 dsh，激活时自动加载。
+# ===================================================================
+
+ai:
+  # dsh 模式：所有 LLM 调用 POST 给 dsh 桥接端点，跳过本地积分计量
+  client:
+    mode: dsh
+
+  # 私有部署/桥接场景下，sa-token 上下文不可用时的审计默认值
+  gateway-caller:
+    tenant-id: 1
+    user-name: wms-dsh-bridge
+
+# === dsh 桥接端点对接配置 ===
+# 注意：bridge-token 必须与 dsh 侧 wms-llm-bridge 插件的 sharedSecret 严格一致
+dsh:
+  gateway:
+    # dsh 服务地址；本地联调 = 127.0.0.1:3080，线上 = dsh 部署机器的内网地址
+    base-url: ${DSH_BASE_URL:http://127.0.0.1:3080}
+
+    # 共享密钥 Header 名（与 dsh 侧配置保持一致）
+    header-name: X-WMS-Bridge-Token
+
+    # 共享密钥（强制环境变量注入，禁止明文写入；≥32 位强随机串）
+    bridge-token: ${DSH_BRIDGE_TOKEN:please-change-me}
+
+    # 文本/视觉模型名：留空 = 用 dsh 当前默认模型；填写 = dsh 按该名称路由
+    # （模型必须在 dsh「设置 → 模型」里已配置，否则 dsh 侧报错）
+    text-model: ${DSH_TEXT_MODEL:}
+    vision-model: ${DSH_VISION_MODEL:}
+
+    # 连接 & 读超时；模型推理较慢，read 建议 >= 60000
+    connect-timeout-ms: 5000
+    read-timeout-ms: 90000
+
+    # 审计字段（可留空，由 CallerContextResolver 动态填充）
+    tenant-tag: ${WMS_TENANT_TAG:}
+    user-tag: ${WMS_USER_TAG:}
+
+# === 回退到 SaaS ===
+# 将环境变量 AI_CLIENT_MODE 设为 saas（或移除 dsh profile）并重启，
+# 即回到原 saas 模式（读 application.yml 的 qwen key、照常扣点）。

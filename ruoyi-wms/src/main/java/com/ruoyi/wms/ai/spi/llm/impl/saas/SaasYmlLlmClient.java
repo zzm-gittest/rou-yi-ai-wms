@@ -15,6 +15,7 @@ import okhttp3.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -27,9 +28,12 @@ import java.util.concurrent.TimeUnit;
  * <p>这是历史 {@code QwenLlmService} + {@code MultimodalLlmService} 的行为抽取版，
  * 保持完全相同的请求体与响应解析逻辑，确保现网兼容。</p>
  *
+ * <p>启用条件：{@code ai.client.mode=saas}（默认）或未配置。</p>
+ *
  * @author ruoyi
  */
 @Component
+@ConditionalOnProperty(name = "ai.client.mode", havingValue = "saas", matchIfMissing = true)
 public class SaasYmlLlmClient implements LlmClient {
 
     private static final Logger log = LoggerFactory.getLogger(SaasYmlLlmClient.class);
@@ -136,9 +140,8 @@ public class SaasYmlLlmClient implements LlmClient {
         try (Response response = httpClient.newCall(httpRequest).execute()) {
             String responseBody = response.body() != null ? response.body().string() : null;
             if (!response.isSuccessful() || responseBody == null) {
-                log.error("[SaasYmlLlmClient] vision 调用失败: model={}, code={}, body={}", model, response.code(), responseBody);
-                throw new RuntimeException("截图识别服务暂不可用: " + extractUpstreamError(responseBody, response.code())
-                    + "（模型: " + model + "）");
+                log.error("[SaasYmlLlmClient] vision 调用失败: code={}, body={}", response.code(), responseBody);
+                throw new RuntimeException("截图识别服务暂不可用，请稍后再试");
             }
             return parseChatCompletionResponse(responseBody, model, request.getRequestId(),
                 (int) (System.currentTimeMillis() - start));
@@ -291,29 +294,5 @@ public class SaasYmlLlmClient implements LlmClient {
             .replace("\n", "\\n")
             .replace("\r", "\\r")
             .replace("\t", "\\t");
-    }
-
-    /**
-     * 从上游错误响应中提取可读的错误信息（截断到 120 字符，避免前端提示过长）
-     */
-    private String extractUpstreamError(String responseBody, int httpCode) {
-        if (responseBody == null || responseBody.isBlank()) {
-            return "HTTP " + httpCode;
-        }
-        try {
-            JsonNode root = objectMapper.readTree(responseBody);
-            JsonNode err = root.get("error");
-            if (err != null) {
-                String message = err.has("message") ? err.get("message").asText() : null;
-                String code = err.has("code") ? err.get("code").asText() : null;
-                if (message != null && !message.isBlank()) {
-                    return code != null ? code + ": " + message : message;
-                }
-            }
-        } catch (Exception ignore) {
-            // 非 JSON 响应，直接截断原文
-        }
-        String text = responseBody.trim();
-        return text.length() > 120 ? text.substring(0, 120) + "..." : text;
     }
 }

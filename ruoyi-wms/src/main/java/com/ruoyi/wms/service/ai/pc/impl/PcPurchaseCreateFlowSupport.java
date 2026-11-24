@@ -119,9 +119,11 @@ class PcPurchaseCreateFlowSupport {
                     unmatchedIndexes.add(index);
                     continue;
                 }
-                WmsGoodsSkuRespVO exact = owner.chooseExactOrSingle(candidates, draft.name);
-                if (exact != null) {
-                    chosen = exact;
+                // 候选中恰好 1 个且命名完全相同 → 直接自动选中；
+                // 其余情况（含恰好 1 个但名字不完全相同）统一进候选卡（带「以上都不是」）。
+                WmsGoodsSkuRespVO exactNamed = owner.chooseExactlyNamedSingle(candidates, draft.name);
+                if (exactNamed != null) {
+                    chosen = exactNamed;
                 } else {
                     state.setPreparedLines(resolvedLines);
                     owner.preparePendingGoods(state, draft, index, candidates.stream().map(owner::toGoodsOption).collect(Collectors.toList()));

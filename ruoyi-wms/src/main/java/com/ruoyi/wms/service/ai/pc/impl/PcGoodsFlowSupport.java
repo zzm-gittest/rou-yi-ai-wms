@@ -187,7 +187,7 @@ class PcGoodsFlowSupport {
     Map<String, Object> goodsCandidateCard(PcState state) {
         Map<String, Object> card = new HashMap<>();
         card.put("type", "CANDIDATE");
-        card.put("title", "商品有多个候选，请选择");
+        card.put("title", totalPages(state.getPendingGoodsCandidates()) == 1 ? "商品候选确认" : "商品有多个候选，请选择");
         card.put("selectionMode", "single-list");
         card.put("page", state.getPendingGoodsCandidatePage());
         card.put("totalPages", totalPages(state.getPendingGoodsCandidates()));
@@ -210,7 +210,9 @@ class PcGoodsFlowSupport {
     String buildGoodsCandidateText(PcState state) {
         List<IdNameOption> options = currentPageOptions(state.getPendingGoodsCandidates(), state.getPendingGoodsCandidatePage());
         StringBuilder sb = new StringBuilder();
-        sb.append("商品【").append(state.getPendingGoodsName()).append("】匹配到多个候选，请选择：\n");
+        boolean single = state.getPendingGoodsCandidates() != null && state.getPendingGoodsCandidates().size() == 1;
+        sb.append("商品【").append(state.getPendingGoodsName()).append("】")
+                .append(single ? "匹配到 1 个候选，请确认或选择：\n" : "匹配到多个候选，请选择：\n");
         int offset = (state.getPendingGoodsCandidatePage() - 1) * CANDIDATE_PAGE_SIZE;
         for (int index = 0; index < options.size(); index++) {
             sb.append(offset + index + 1).append(". ").append(options.get(index).getName()).append("\n");
